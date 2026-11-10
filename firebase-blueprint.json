@@ -1,0 +1,36 @@
+{
+  "entities": {
+    "RestaurantOrder": {
+      "collection": "orders",
+      "fields": {
+        "orderId": { "type": "string", "required": true },
+        "orderNumber": { "type": "integer", "required": true },
+        "customerName": { "type": "string", "required": true },
+        "tableNumber": { "type": "string", "required": true },
+        "customerPhone": { "type": "string", "required": false },
+        "subtotal": { "type": "number", "required": true },
+        "gst": { "type": "number", "required": true },
+        "totalAmount": { "type": "number", "required": true },
+        "status": { "type": "string", "required": true },
+        "isPaidAtCounter": { "type": "boolean", "required": true },
+        "channelCode": { "type": "string", "required": true },
+        "userId": { "type": "string", "required": true },
+        "createdAt": { "type": "timestamp", "required": false },
+        "completedAt": { "type": "timestamp", "required": false }
+      }
+    },
+    "MenuItemDoc": {
+      "collection": "menu_items",
+      "fields": {
+        "id": { "type": "string", "required": true },
+        "name": { "type": "string", "required": true },
+        "category": { "type": "string", "required": true },
+        "description": { "type": "string", "required": true },
+        "price": { "type": "number", "required": true },
+        "isVeg": { "type": "boolean", "required": true },
+        "spiciness": { "type": "integer", "required": true },
+        "badge": { "type": "string", "required": false }
+      }
+    }
+  }
+}

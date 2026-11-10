@@ -1,0 +1,8 @@
+{
+  "firestore": [
+    {
+      "database": "ai-studio-android-barbeque-1e14d7ef-e381-42a1-a846-99cd194743e5",
+      "rules": "firestore.rules"
+    }
+  ]
+}
