@@ -1,7 +1,7 @@
-# Antigravity Workspace Configuration: VIT Pune Canteen (Barbeque Nation)
+# Antigravity Workspace Configuration: VIT Pune Canteen
 
 ## Project Overview
-- **Name**: Barbeque Nation Order, Customiser & Chef Portal (`vit-pune-canteen`)
+- **Name**: VIT Pune Canteen Order, Customiser & Chef Portal (`vit-pune-canteen`)
 - **Type**: Android (Jetpack Compose / Kotlin) application with Firebase & Room / local sync.
 - **Key Features**:
   - Live Grill & Buffet Menu customization (ingredient exclusion chips & chef notes).
