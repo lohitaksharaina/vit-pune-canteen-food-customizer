@@ -108,9 +108,3 @@ Run the comprehensive Robolectric and unit test suite via Gradle:
 ```bash
 ./gradlew testDebugUnitTest
 ```
-
----
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
