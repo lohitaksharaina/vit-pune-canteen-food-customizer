@@ -16,8 +16,8 @@ android {
     applicationId = "com.aistudio.bbqorder.kqzxp"
     minSdk = 24
     targetSdk = 36
-    versionCode = 1
-    versionName = "1.0"
+    versionCode = 3
+    versionName = "1.2"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
@@ -50,9 +50,7 @@ android {
       signingConfig = signingConfigs.getByName("release")
     }
     debug {
-      // Do not remove or modify this signingConfig assignment. It is necessary for Android apps in
-      // Codex ChatGPT.
-      signingConfig = signingConfigs.getByName("debugConfig")
+      // Standard debug build
     }
   }
   compileOptions {

@@ -14,19 +14,21 @@ data class AuthUser(
 )
 
 object DemoCredentials {
-    val ACCOUNTS = mapOf(
-        "student" to Triple("vit_student", UserRole.STUDENT, "Aarav Sharma (Student)"),
-        "cook" to Triple("vit_cook", UserRole.CHEF, "Chef Shinde (Canteen Kitchen)"),
-        "admin" to Triple("vit_admin", UserRole.ADMIN, "VIT Canteen Manager (Admin)")
+    private val VALID_CREDENTIALS = mapOf(
+        "student" to Triple(setOf("vit_student", "student"), UserRole.STUDENT, "Aarav Sharma (Student)"),
+        "cook" to Triple(setOf("vit_cook", "cook", "chef", "vit_chef"), UserRole.CHEF, "Chef Shinde (Canteen Kitchen)"),
+        "chef" to Triple(setOf("vit_cook", "cook", "chef", "vit_chef"), UserRole.CHEF, "Chef Shinde (Canteen Kitchen)"),
+        "admin" to Triple(setOf("vit_admin", "admin"), UserRole.ADMIN, "VIT Canteen Manager (Admin)")
     )
 
     fun authenticate(username: String, password: String): AuthUser? {
         val normalizedUser = username.trim().lowercase()
-        val entry = ACCOUNTS[normalizedUser] ?: return null
-        if (entry.first == password.trim()) {
+        val entry = VALID_CREDENTIALS[normalizedUser] ?: return null
+        val trimmedPass = password.trim()
+        if (entry.first.contains(trimmedPass)) {
             val role = entry.second
             return AuthUser(
-                username = normalizedUser,
+                username = if (normalizedUser == "chef") "cook" else normalizedUser,
                 role = role,
                 displayName = entry.third,
                 email = when (role) {

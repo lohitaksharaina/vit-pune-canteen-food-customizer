@@ -40,7 +40,7 @@ class OrderRepository private constructor() {
     private val _prunedCount = MutableStateFlow(0)
     val prunedCount: StateFlow<Int> = _prunedCount.asStateFlow()
 
-    private val nextOrderSequence = AtomicInteger(101)
+    private val nextOrderSequence = AtomicInteger(103)
 
     init {
         seedInitialDemoOrders()

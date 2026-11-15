@@ -459,7 +459,7 @@ fun DigitalBillDialog(
                         )
                     ) {
                         Text(
-                            text = "Back to Menu",
+                            text = if (onTrackOrder != null) "Back to Menu" else "Close Bill",
                             style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
                             color = WarmIvory
                         )

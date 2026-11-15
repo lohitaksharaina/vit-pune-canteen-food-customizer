@@ -449,7 +449,7 @@ class RestaurantViewModel : ViewModel() {
             showTransientStatus("Welcome, ${user.displayName}! Signed in as ${user.role.badge}.")
             true
         } else {
-            showTransientStatus("Invalid credentials. Try student / vit_student, cook / vit_cook, or admin / vit_admin.")
+            showTransientStatus("Invalid credentials. Please select student, cook, or admin demo accounts.")
             false
         }
     }

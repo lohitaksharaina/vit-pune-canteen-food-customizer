@@ -196,7 +196,7 @@ class FirestoreRestaurantRepository(
         }
 
         try {
-            docRef.update(updates).await()
+            docRef.set(updates, SetOptions.merge()).await()
             Log.d(TAG, "Order $orderId status updated to ${newStatus.name}")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to update order status $orderId", e)

@@ -258,13 +258,20 @@ fun TopRestaurantBar(
                             )
                         }
                         else -> {
-                            // STUDENT or default
+                            // STUDENT or default (allows instant dual-mode inspection)
                             ModePill(
                                 title = "Customer Menu",
                                 icon = Icons.Default.Restaurant,
                                 isSelected = currentMode == AppMode.CUSTOMER,
                                 onClick = { onModeChange(AppMode.CUSTOMER) },
                                 testTag = "mode_customer_button"
+                            )
+                            ModePill(
+                                title = "Kitchen KDS",
+                                icon = Icons.Default.SoupKitchen,
+                                isSelected = currentMode == AppMode.CHEF,
+                                onClick = { onModeChange(AppMode.CHEF) },
+                                testTag = "mode_chef_button"
                             )
                         }
                     }

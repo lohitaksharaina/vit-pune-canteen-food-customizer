@@ -251,10 +251,12 @@ fun RestaurantApp(viewModel: RestaurantViewModel = viewModel()) {
         DigitalBillDialog(
             order = activeBill,
             onDismiss = { viewModel.dismissBill() },
-            onTrackOrder = {
-                viewModel.dismissBill()
-                viewModel.setMode(AppMode.CUSTOMER)
-            }
+            onTrackOrder = if (currentMode == AppMode.CUSTOMER) {
+                {
+                    viewModel.dismissBill()
+                    viewModel.setMode(AppMode.CUSTOMER)
+                }
+            } else null
         )
 
         // Online Sync & Data Sharing Settings Dialog

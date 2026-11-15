@@ -170,7 +170,7 @@ fun LoginScreen(
                     // 1. Student Demo Account
                     DemoAccountItem(
                         title = "Student Mode",
-                        subtitle = "username: student • pass: vit_student",
+                        subtitle = "username: student",
                         badge = "Student",
                         badgeColor = Color(0xFF1565C0),
                         icon = Icons.Default.School,
@@ -188,7 +188,7 @@ fun LoginScreen(
                     // 2. Chef / Cook Demo Account
                     DemoAccountItem(
                         title = "Chef / Cook Mode",
-                        subtitle = "username: cook • pass: vit_cook",
+                        subtitle = "username: cook",
                         badge = "Cook",
                         badgeColor = Color(0xFFE65100),
                         icon = Icons.Default.SoupKitchen,
@@ -206,7 +206,7 @@ fun LoginScreen(
                     // 3. Admin Demo Account
                     DemoAccountItem(
                         title = "Admin Mode",
-                        subtitle = "username: admin • pass: vit_admin",
+                        subtitle = "username: admin",
                         badge = "Admin",
                         badgeColor = Color(0xFF6A1B9A),
                         icon = Icons.Default.AdminPanelSettings,
@@ -252,6 +252,20 @@ fun LoginScreen(
                         onValueChange = {
                             username = it
                             errorMessage = null
+                            val lower = it.trim().lowercase()
+                            if (lower == "cook" || lower == "chef") {
+                                if (password == "vit_student" || password == "student" || password.isEmpty()) {
+                                    password = "vit_cook"
+                                }
+                            } else if (lower == "admin") {
+                                if (password == "vit_student" || password == "student" || password.isEmpty()) {
+                                    password = "vit_admin"
+                                }
+                            } else if (lower == "student") {
+                                if (password == "vit_cook" || password == "vit_admin" || password.isEmpty()) {
+                                    password = "vit_student"
+                                }
+                            }
                         },
                         label = { Text("Username") },
                         placeholder = { Text("e.g. student, cook, admin") },
@@ -315,7 +329,7 @@ fun LoginScreen(
                                 focusManager.clearFocus()
                                 val success = onLogin(username, password)
                                 if (!success) {
-                                    errorMessage = "Invalid username or password. Please use demo credentials."
+                                    errorMessage = "Invalid credentials. Tap a demo account card above (Student, Cook, or Admin) to fill."
                                 }
                             }
                         ),
@@ -365,7 +379,7 @@ fun LoginScreen(
                             focusManager.clearFocus()
                             val success = onLogin(username, password)
                             if (!success) {
-                                errorMessage = "Invalid username or password. Please use demo credentials above."
+                                errorMessage = "Invalid credentials. Tap a demo account card above (Student, Cook, or Admin) to fill."
                             }
                         },
                         modifier = Modifier

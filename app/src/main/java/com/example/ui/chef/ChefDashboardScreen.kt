@@ -1,11 +1,16 @@
 package com.example.ui.chef
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -20,15 +25,13 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.AutoDelete
 import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.EditNote
-import androidx.compose.material.icons.filled.FilterList
-import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SoupKitchen
@@ -38,7 +41,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Divider
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
@@ -50,6 +53,7 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -89,321 +93,367 @@ fun ChefDashboardScreen(
     onResetWaitlistOrders: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // Filter orders
-    val displayedOrders = orders.filter { order ->
-        val matchesStatus = statusFilter == null || order.status == statusFilter
-        val matchesQuery = searchQuery.isBlank() ||
-            order.orderId.contains(searchQuery, ignoreCase = true) ||
-            order.tableNumber.contains(searchQuery, ignoreCase = true) ||
-            order.customerName.contains(searchQuery, ignoreCase = true) ||
-            order.orderNumber.toString().contains(searchQuery)
-        matchesStatus && matchesQuery
+    // Memoized filter for smooth scrolling and elimination of re-calculation jank
+    val displayedOrders = remember(orders, statusFilter, searchQuery) {
+        val trimmedQuery = searchQuery.trim()
+        orders.filter { order ->
+            val matchesStatus = statusFilter == null || order.status == statusFilter
+            val matchesQuery = trimmedQuery.isBlank() ||
+                order.orderId.contains(trimmedQuery, ignoreCase = true) ||
+                order.tableNumber.contains(trimmedQuery, ignoreCase = true) ||
+                order.customerName.contains(trimmedQuery, ignoreCase = true) ||
+                order.orderNumber.toString().contains(trimmedQuery)
+            matchesStatus && matchesQuery
+        }.distinctBy { it.orderId } // Prevents LazyColumn duplicate key crash
     }
 
-    Column(
+    // Memoize status counts to avoid multiple full list iterations per recomposition frame
+    val orderCounts = remember(orders) {
+        mapOf(
+            null to orders.size,
+            OrderStatus.RECEIVED to orders.count { it.status == OrderStatus.RECEIVED },
+            OrderStatus.ACCEPTED_PREPARING to orders.count { it.status == OrderStatus.ACCEPTED_PREPARING },
+            OrderStatus.READY_FOR_COUNTER to orders.count { it.status == OrderStatus.READY_FOR_COUNTER },
+            OrderStatus.COMPLETED_SETTLED to orders.count { it.status == OrderStatus.COMPLETED_SETTLED }
+        )
+    }
+
+    // Single unified LazyColumn root to solve the "kitchen non scrolling bug" completely
+    LazyColumn(
         modifier = modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
+            .testTag("chef_tickets_list"),
+        contentPadding = PaddingValues(bottom = 32.dp)
     ) {
-        // Chef KDS Control Panel Card
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-        ) {
-            Column(
+        // 1. Chef KDS Control Panel Card
+        item(key = "kds_control_card") {
+            Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(14.dp)
+                    .padding(horizontal = 16.dp, vertical = 10.dp)
+                    .animateContentSize(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
             ) {
-                // Header: KDS Status & Workload Counter
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(14.dp)
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    // Header: KDS Status & Workload Counter
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(38.dp)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(Color(0xFF381400)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.SoupKitchen,
+                                    contentDescription = null,
+                                    tint = FlameOrange,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column {
+                                Text(
+                                    text = "KITCHEN DISPLAY SYSTEM",
+                                    style = MaterialTheme.typography.titleMedium.copy(
+                                        fontWeight = FontWeight.Black,
+                                        letterSpacing = 0.5.sp
+                                    ),
+                                    color = WarmIvory
+                                )
+                                Text(
+                                    text = "Vishwakarma Institute of Technology • Canteen KDS",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+
+                        // Active Capacity Meter
                         Box(
                             modifier = Modifier
-                                .size(36.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(Color(0xFF381400)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.SoupKitchen,
-                                contentDescription = null,
-                                tint = FlameOrange,
-                                modifier = Modifier.size(22.dp)
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Column {
-                            Text(
-                                text = "KITCHEN DISPLAY SYSTEM",
-                                style = MaterialTheme.typography.titleMedium.copy(
-                                    fontWeight = FontWeight.Black,
-                                    letterSpacing = 0.5.sp
-                                ),
-                                color = WarmIvory
-                            )
-                            Text(
-                                text = "Vishwakarma Institute of Technology • Canteen KDS",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-
-                    // Active Capacity Meter
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(if (isWaitlistActive) Color(0xFF4A1010) else Color(0xFF1E2818))
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(if (isWaitlistActive) Color(0xFF4A1010) else Color(0xFF1E2818))
                             .border(
                                 1.dp,
                                 if (isWaitlistActive) NonVegRed else SuccessGreen,
                                 RoundedCornerShape(12.dp)
                             )
                             .padding(horizontal = 10.dp, vertical = 6.dp)
+                        ) {
+                            Column(horizontalAlignment = Alignment.End) {
+                                Text(
+                                    text = if (isWaitlistActive) "WAITLIST ACTIVE" else "NORMAL LOAD",
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 10.sp
+                                    ),
+                                    color = if (isWaitlistActive) Color(0xFFFF8A80) else SuccessGreen
+                                )
+                                Text(
+                                    text = "$activeOrdersCount / 30 Active",
+                                    style = MaterialTheme.typography.titleSmall.copy(
+                                        fontWeight = FontWeight.Black
+                                    ),
+                                    color = WarmIvory
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    // Queue Testing Tools (Allows testing the 30-limit waitlist guard cleanly)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Column(horizontalAlignment = Alignment.End) {
+                        OutlinedButton(
+                            onClick = onFillWaitlistForTesting,
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("test_fill_waitlist_button"),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
                             Text(
-                                text = if (isWaitlistActive) "WAITLIST FULL" else "NORMAL CAPACITY",
-                                style = MaterialTheme.typography.labelSmall.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 10.sp
-                                ),
-                                color = if (isWaitlistActive) Color(0xFFFF8A80) else SuccessGreen
+                                text = "Fill to 30 (Test Waitlist)",
+                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                                color = WaitlistAmber
                             )
+                        }
+
+                        OutlinedButton(
+                            onClick = onResetWaitlistOrders,
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("test_clear_waitlist_button"),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
                             Text(
-                                text = "$activeOrdersCount / 30 Active",
-                                style = MaterialTheme.typography.titleSmall.copy(
-                                    fontWeight = FontWeight.Black
-                                ),
-                                color = WarmIvory
+                                text = "Clear Test Orders",
+                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+
+                        OutlinedButton(
+                            onClick = onTriggerAutoPurge,
+                            modifier = Modifier.testTag("trigger_purge_button"),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.AutoDelete,
+                                contentDescription = "7-Day Purge",
+                                modifier = Modifier.size(14.dp),
+                                tint = MaterialTheme.colorScheme.secondary
                             )
                         }
                     }
                 }
+            }
+        }
 
-                Spacer(modifier = Modifier.height(10.dp))
+        // 2. Search & Filter Status Chips
+        item(key = "kds_search_and_filters") {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+            ) {
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = onSearchChange,
+                    placeholder = {
+                        Text(
+                            text = "Search Order #, Token, Table...",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Default.Search,
+                            contentDescription = "Search",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    },
+                    trailingIcon = {
+                        AnimatedVisibility(
+                            visible = searchQuery.isNotEmpty(),
+                            enter = fadeIn(),
+                            exit = fadeOut()
+                        ) {
+                            IconButton(onClick = { onSearchChange("") }) {
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = "Clear",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    },
+                    singleLine = true,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("chef_search_input"),
+                    shape = RoundedCornerShape(10.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = WarmIvory,
+                        unfocusedTextColor = WarmIvory,
+                        focusedBorderColor = FlameOrange,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outline
+                    )
+                )
 
-                // Queue Testing Tools (Allows user to test the 30-limit waitlist requirement easily!)
-                Row(
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Status Filter Tabs
+                LazyRow(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    OutlinedButton(
-                        onClick = onFillWaitlistForTesting,
-                        modifier = Modifier
-                            .weight(1f)
-                            .testTag("test_fill_waitlist_button"),
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        Text(
-                            text = "Fill to 30 (Test Waitlist)",
-                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-                            color = WaitlistAmber
+                    item {
+                        FilterChip(
+                            selected = statusFilter == null,
+                            onClick = { onStatusFilterChange(null) },
+                            label = { Text("All (${orderCounts[null] ?: 0})") },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = FlameOrange,
+                                selectedLabelColor = Color.White
+                            )
                         )
                     }
+                    item {
+                        FilterChip(
+                            selected = statusFilter == OrderStatus.RECEIVED,
+                            onClick = {
+                                onStatusFilterChange(if (statusFilter == OrderStatus.RECEIVED) null else OrderStatus.RECEIVED)
+                            },
+                            label = {
+                                Text("Incoming (${orderCounts[OrderStatus.RECEIVED] ?: 0})")
+                            },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = FlameOrange,
+                                selectedLabelColor = Color.White
+                            )
+                        )
+                    }
+                    item {
+                        FilterChip(
+                            selected = statusFilter == OrderStatus.ACCEPTED_PREPARING,
+                            onClick = {
+                                onStatusFilterChange(if (statusFilter == OrderStatus.ACCEPTED_PREPARING) null else OrderStatus.ACCEPTED_PREPARING)
+                            },
+                            label = {
+                                Text("Preparing (${orderCounts[OrderStatus.ACCEPTED_PREPARING] ?: 0})")
+                            },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = FlameOrange,
+                                selectedLabelColor = Color.White
+                            )
+                        )
+                    }
+                    item {
+                        FilterChip(
+                            selected = statusFilter == OrderStatus.READY_FOR_COUNTER,
+                            onClick = {
+                                onStatusFilterChange(if (statusFilter == OrderStatus.READY_FOR_COUNTER) null else OrderStatus.READY_FOR_COUNTER)
+                            },
+                            label = {
+                                Text("Ready (${orderCounts[OrderStatus.READY_FOR_COUNTER] ?: 0})")
+                            },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = FlameOrange,
+                                selectedLabelColor = Color.White
+                            )
+                        )
+                    }
+                    item {
+                        FilterChip(
+                            selected = statusFilter == OrderStatus.COMPLETED_SETTLED,
+                            onClick = {
+                                onStatusFilterChange(if (statusFilter == OrderStatus.COMPLETED_SETTLED) null else OrderStatus.COMPLETED_SETTLED)
+                            },
+                            label = {
+                                Text("Settled (${orderCounts[OrderStatus.COMPLETED_SETTLED] ?: 0})")
+                            },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = FlameOrange,
+                                selectedLabelColor = Color.White
+                            )
+                        )
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(10.dp))
+        }
 
-                    OutlinedButton(
-                        onClick = onResetWaitlistOrders,
-                        modifier = Modifier
-                            .weight(1f)
-                            .testTag("test_clear_waitlist_button"),
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
+        // 3. Kitchen Order Tickets List or Empty State
+        if (displayedOrders.isEmpty()) {
+            item(key = "empty_state") {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 48.dp, horizontal = 24.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(
+                            imageVector = Icons.Default.SoupKitchen,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                            modifier = Modifier.size(48.dp)
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
                         Text(
-                            text = "Clear Test Orders",
-                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                            text = if (searchQuery.isNotBlank()) "No tickets found for '$searchQuery'" else "No kitchen tickets matching this filter.",
+                            style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                    }
-
-                    OutlinedButton(
-                        onClick = onTriggerAutoPurge,
-                        modifier = Modifier.testTag("trigger_purge_button"),
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.AutoDelete,
-                            contentDescription = "7-Day Purge",
-                            modifier = Modifier.size(14.dp),
-                            tint = MaterialTheme.colorScheme.secondary
-                        )
-                    }
-                }
-            }
-        }
-
-        // Search & Filter Status Chips
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp)
-        ) {
-            OutlinedTextField(
-                value = searchQuery,
-                onValueChange = onSearchChange,
-                placeholder = {
-                    Text(
-                        text = "Search Order #, Token, Table...",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                },
-                leadingIcon = {
-                    Icon(
-                        imageVector = Icons.Default.Search,
-                        contentDescription = "Search",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                },
-                trailingIcon = {
-                    if (searchQuery.isNotEmpty()) {
-                        IconButton(onClick = { onSearchChange("") }) {
-                            Icon(
-                                imageVector = Icons.Default.Close,
-                                contentDescription = "Clear",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                        if (statusFilter != null || searchQuery.isNotBlank()) {
+                            Spacer(modifier = Modifier.height(14.dp))
+                            OutlinedButton(
+                                onClick = {
+                                    onStatusFilterChange(null)
+                                    onSearchChange("")
+                                },
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Text("Show All Orders (${orders.size})", color = FlameOrange)
+                            }
                         }
                     }
-                },
-                singleLine = true,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("chef_search_input"),
-                shape = RoundedCornerShape(10.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedTextColor = WarmIvory,
-                    unfocusedTextColor = WarmIvory,
-                    focusedBorderColor = FlameOrange,
-                    unfocusedBorderColor = MaterialTheme.colorScheme.outline
-                )
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // Status Filter Tabs
-            LazyRow(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                item {
-                    FilterChip(
-                        selected = statusFilter == null,
-                        onClick = { onStatusFilterChange(null) },
-                        label = { Text("All Orders (${orders.size})") },
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = FlameOrange,
-                            selectedLabelColor = Color.White
-                        )
-                    )
                 }
-                item {
-                    FilterChip(
-                        selected = statusFilter == OrderStatus.RECEIVED,
-                        onClick = {
-                            onStatusFilterChange(if (statusFilter == OrderStatus.RECEIVED) null else OrderStatus.RECEIVED)
-                        },
-                        label = {
-                            Text("Incoming (${orders.count { it.status == OrderStatus.RECEIVED }})")
-                        },
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = FlameOrange,
-                            selectedLabelColor = Color.White
-                        )
-                    )
-                }
-                item {
-                    FilterChip(
-                        selected = statusFilter == OrderStatus.ACCEPTED_PREPARING,
-                        onClick = {
-                            onStatusFilterChange(if (statusFilter == OrderStatus.ACCEPTED_PREPARING) null else OrderStatus.ACCEPTED_PREPARING)
-                        },
-                        label = {
-                            Text("Preparing (${orders.count { it.status == OrderStatus.ACCEPTED_PREPARING }})")
-                        },
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = FlameOrange,
-                            selectedLabelColor = Color.White
-                        )
-                    )
-                }
-                item {
-                    FilterChip(
-                        selected = statusFilter == OrderStatus.READY_FOR_COUNTER,
-                        onClick = {
-                            onStatusFilterChange(if (statusFilter == OrderStatus.READY_FOR_COUNTER) null else OrderStatus.READY_FOR_COUNTER)
-                        },
-                        label = {
-                            Text("Ready (${orders.count { it.status == OrderStatus.READY_FOR_COUNTER }})")
-                        },
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = FlameOrange,
-                            selectedLabelColor = Color.White
-                        )
-                    )
-                }
-                item {
-                    FilterChip(
-                        selected = statusFilter == OrderStatus.COMPLETED_SETTLED,
-                        onClick = {
-                            onStatusFilterChange(if (statusFilter == OrderStatus.COMPLETED_SETTLED) null else OrderStatus.COMPLETED_SETTLED)
-                        },
-                        label = {
-                            Text("Settled (${orders.count { it.status == OrderStatus.COMPLETED_SETTLED }})")
-                        },
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = FlameOrange,
-                            selectedLabelColor = Color.White
-                        )
-                    )
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        // Kitchen Order Tickets List
-        if (displayedOrders.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(32.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "No kitchen tickets matching this filter.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
             }
         } else {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .testTag("chef_tickets_list"),
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                    horizontal = 16.dp,
-                    vertical = 8.dp
-                )
-            ) {
-                items(displayedOrders, key = { it.orderId }) { order ->
+            items(displayedOrders, key = { it.orderId }) { order ->
+                Box(modifier = Modifier.padding(horizontal = 16.dp)) {
                     ChefOrderTicketCard(
                         order = order,
-                        onAccept = { onAcceptOrder(order.orderId) },
-                        onMarkReady = { onMarkReady(order.orderId) },
-                        onMarkPaidAtCounter = { onMarkPaidAtCounter(order.orderId) },
+                        onAccept = {
+                            try { onAcceptOrder(order.orderId) } catch (_: Exception) {}
+                        },
+                        onMarkReady = {
+                            try { onMarkReady(order.orderId) } catch (_: Exception) {}
+                        },
+                        onMarkPaidAtCounter = {
+                            try { onMarkPaidAtCounter(order.orderId) } catch (_: Exception) {}
+                        },
                         onViewBill = { onViewBill(order) }
                     )
-                    Spacer(modifier = Modifier.height(12.dp))
                 }
+                Spacer(modifier = Modifier.height(12.dp))
             }
         }
     }
@@ -417,7 +467,22 @@ fun ChefOrderTicketCard(
     onMarkPaidAtCounter: () -> Unit,
     onViewBill: () -> Unit
 ) {
-    val timeAgo = SimpleDateFormat("hh:mm a", Locale.getDefault()).format(Date(order.createdAt))
+    // Cache formatted timestamp to prevent jank during list scrolling
+    val timeFormatted = remember(order.createdAt) {
+        try {
+            SimpleDateFormat("hh:mm a", Locale.getDefault()).format(Date(order.createdAt))
+        } catch (_: Exception) {
+            "Just now"
+        }
+    }
+
+    // Elapsed waiting time indicator
+    val elapsedMinutes = remember(order.createdAt) {
+        val diff = System.currentTimeMillis() - order.createdAt
+        (diff / (60 * 1000L)).coerceAtLeast(0)
+    }
+
+    val isUrgent = order.status == OrderStatus.RECEIVED && elapsedMinutes >= 15
 
     Card(
         shape = RoundedCornerShape(14.dp),
@@ -427,6 +492,7 @@ fun ChefOrderTicketCard(
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
         modifier = Modifier
             .fillMaxWidth()
+            .animateContentSize()
             .testTag("chef_ticket_${order.orderId}")
     ) {
         Column(
@@ -463,11 +529,20 @@ fun ChefOrderTicketCard(
                             style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
                             color = WarmIvory
                         )
-                        Text(
-                            text = "Received at $timeAgo",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.AccessTime,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(12.dp)
+                            )
+                            Spacer(modifier = Modifier.width(3.dp))
+                            Text(
+                                text = "Received at $timeFormatted (${elapsedMinutes}m ago)",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = if (isUrgent) WaitlistAmber else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                 }
 
@@ -501,7 +576,7 @@ fun ChefOrderTicketCard(
                 }
             }
 
-            Divider(
+            HorizontalDivider(
                 color = MaterialTheme.colorScheme.outline,
                 modifier = Modifier.padding(vertical = 10.dp)
             )
