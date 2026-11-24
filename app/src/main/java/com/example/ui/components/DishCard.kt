@@ -1,5 +1,6 @@
 package com.example.ui.components
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -8,6 +9,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -33,20 +35,68 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.platform.LocalContext
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import com.example.data.model.MenuCategory
 import com.example.data.model.MenuItem
 import com.example.ui.theme.FlameOrange
 import com.example.ui.theme.NonVegRed
 import com.example.ui.theme.VegGreen
 import com.example.ui.theme.WarmIvory
+
+@Composable
+fun FoodCategoryPlaceholder(
+    category: MenuCategory,
+    dishName: String,
+    modifier: Modifier = Modifier
+) {
+    val gradient = when (category) {
+        MenuCategory.PUNERI_NASHTA -> listOf(Color(0xFF5A1E08), Color(0xFF260D04))
+        MenuCategory.SANDWICH_MAGGI -> listOf(Color(0xFF52280A), Color(0xFF261204))
+        MenuCategory.MEALS_THALI -> listOf(Color(0xFF4A2A06), Color(0xFF1F1203))
+        MenuCategory.SOUTH_INDIAN -> listOf(Color(0xFF214418), Color(0xFF0F200B))
+        MenuCategory.RICE_NOODLES -> listOf(Color(0xFF521515), Color(0xFF260909))
+        MenuCategory.BEVERAGES -> listOf(Color(0xFF1D354D), Color(0xFF0D1824))
+        MenuCategory.SWEETS -> listOf(Color(0xFF4A1840), Color(0xFF240A1F))
+        else -> listOf(Color(0xFF3E2419), Color(0xFF1E1714))
+    }
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(Brush.verticalGradient(gradient)),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+            modifier = Modifier.padding(8.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.LocalFireDepartment,
+                contentDescription = null,
+                tint = FlameOrange.copy(alpha = 0.45f),
+                modifier = Modifier.size(42.dp)
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = category.title,
+                style = MaterialTheme.typography.labelSmall.copy(
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 11.sp,
+                    letterSpacing = 0.5.sp
+                ),
+                color = WarmIvory.copy(alpha = 0.75f)
+            )
+        }
+    }
+}
 
 @Composable
 fun DishCard(
@@ -56,10 +106,11 @@ fun DishCard(
     modifier: Modifier = Modifier
 ) {
     Card(
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         ),
+        border = BorderStroke(1.dp, Color(0x1FFFFFFF)),
         elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
         modifier = modifier
             .fillMaxWidth()
@@ -67,62 +118,48 @@ fun DishCard(
             .testTag("dish_card_${item.id}")
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
-            // Visual header image or grill gradient
+            // Visual header image or graceful category gradient
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(145.dp)
+                    .height(150.dp)
             ) {
-                if (!item.imageUrl.isNullOrBlank()) {
-                    AsyncImage(
-                        model = ImageRequest.Builder(LocalContext.current)
-                            .data(item.imageUrl)
-                            .crossfade(true)
-                            .error(item.drawableResId ?: android.R.drawable.ic_menu_gallery)
-                            .build(),
-                        contentDescription = item.name,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                } else if (item.drawableResId != null) {
+                // Base layer: Always visible appetizing gradient
+                FoodCategoryPlaceholder(
+                    category = item.category,
+                    dishName = item.name,
+                    modifier = Modifier.fillMaxSize()
+                )
+
+                // Foreground photo layer: bundled drawable takes immediate priority
+                if (item.drawableResId != null) {
                     Image(
                         painter = painterResource(id = item.drawableResId),
                         contentDescription = item.name,
                         contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxSize()
                     )
-                } else {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(
-                                Brush.verticalGradient(
-                                    listOf(
-                                        Color(0xFF3E2419),
-                                        Color(0xFF1E1714)
-                                    )
-                                )
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.LocalFireDepartment,
-                            contentDescription = null,
-                            tint = FlameOrange.copy(alpha = 0.35f),
-                            modifier = Modifier.size(64.dp)
-                        )
-                    }
+                } else if (!item.imageUrl.isNullOrBlank()) {
+                    AsyncImage(
+                        model = ImageRequest.Builder(LocalContext.current)
+                            .data(item.imageUrl)
+                            .crossfade(true)
+                            .build(),
+                        contentDescription = item.name,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
                 }
 
-                // Gradient scrim at bottom of image
+                // Smooth gradient vignette at bottom of image
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(60.dp)
+                        .height(65.dp)
                         .align(Alignment.BottomCenter)
                         .background(
                             Brush.verticalGradient(
-                                listOf(Color.Transparent, Color(0xCC1E1B19))
+                                listOf(Color.Transparent, Color(0xE6141211))
                             )
                         )
                 )
@@ -136,7 +173,7 @@ fun DishCard(
                     VegNonVegSymbol(isVeg = item.isVeg)
                 }
 
-                // Custom badge if present or Sold Out badge
+                // Custom badge or Sold Out badge
                 if (!isAvailable) {
                     Box(
                         modifier = Modifier
@@ -161,7 +198,11 @@ fun DishCard(
                             .padding(10.dp)
                             .align(Alignment.TopEnd)
                             .clip(RoundedCornerShape(8.dp))
-                            .background(FlameOrange.copy(alpha = 0.9f))
+                            .background(
+                                Brush.horizontalGradient(
+                                    listOf(FlameOrange, Color(0xFFD84315))
+                                )
+                            )
                             .padding(horizontal = 8.dp, vertical = 4.dp)
                     ) {
                         Text(
@@ -202,7 +243,7 @@ fun DishCard(
                         text = "₹${item.price.toInt()}",
                         style = MaterialTheme.typography.titleMedium.copy(
                             fontWeight = FontWeight.ExtraBold,
-                            color = MaterialTheme.colorScheme.secondary
+                            color = FlameOrange
                         )
                     )
                 }

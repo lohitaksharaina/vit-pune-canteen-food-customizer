@@ -12,31 +12,24 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
-import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.data.model.OrderStatus
 import com.example.ui.admin.AdminDashboardScreen
 import com.example.ui.auth.LoginScreen
 import com.example.ui.chef.ChefDashboardScreen
@@ -50,9 +43,7 @@ import com.example.ui.components.OnlineSyncDialog
 import com.example.ui.components.TopRestaurantBar
 import com.example.ui.customer.CartBottomSheet
 import com.example.ui.customer.CustomerMenuScreen
-import com.example.ui.theme.FlameOrange
 import com.example.ui.theme.MyApplicationTheme
-import com.example.ui.theme.WarmIvory
 import com.example.ui.viewmodel.AppMode
 import com.example.ui.viewmodel.RestaurantViewModel
 import com.example.util.CanteenNotificationHelper
@@ -116,7 +107,7 @@ fun RestaurantApp(viewModel: RestaurantViewModel = viewModel()) {
 
     val userEmail by viewModel.userEmail.collectAsStateWithLifecycle()
 
-    // New feature states
+    // Revenue & Pricing feature states
     val isRevenueReportOpen by viewModel.isRevenueReportOpen.collectAsStateWithLifecycle()
     val activeRevenueReport by viewModel.activeRevenueReport.collectAsStateWithLifecycle()
     val priceAdjustmentTargetOrder by viewModel.priceAdjustmentTargetOrder.collectAsStateWithLifecycle()
@@ -126,21 +117,89 @@ fun RestaurantApp(viewModel: RestaurantViewModel = viewModel()) {
         viewModel.initFirestore(context)
     }
 
-    // Request POST_NOTIFICATIONS permission on Android 13+
+    // Request Android System Notification Permission immediately on startup
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
-    ) { /* no-op — user may deny */ }
-    LaunchedEffect(currentUser) {
-        if (currentUser != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+    ) { isGranted ->
+        if (!isGranted) {
+            // User opted out of status bar notifications
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
     }
 
-    // Show notification for CHEF / ADMIN when a new order arrives
+    // 1. Phone Status Bar Notifications for New Orders
     LaunchedEffect(Unit) {
         viewModel.notifyNewOrder.collect { order ->
             if (currentMode == AppMode.CHEF || currentMode == AppMode.ADMIN) {
                 CanteenNotificationHelper.showNewOrderNotification(context, order)
+            } else {
+                val itemsSummary = order.items.joinToString(", ") { "${it.quantity}x ${it.name}" }
+                CanteenNotificationHelper.showStudentOrderStatusNotification(
+                    context,
+                    order,
+                    "🔔 Order #${order.orderNumber} Placed (${order.tableNumber})",
+                    "$itemsSummary • ₹${order.totalAmount.toInt()} (Sent to kitchen)"
+                )
+            }
+        }
+    }
+
+    // 2. Phone Status Bar Notifications for Order Progress (Preparing, Ready, Settled)
+    var previousOrderStatusMap by remember { mutableStateOf<Map<String, OrderStatus>>(emptyMap()) }
+    LaunchedEffect(orders) {
+        if (previousOrderStatusMap.isNotEmpty()) {
+            orders.forEach { order ->
+                val prevStatus = previousOrderStatusMap[order.orderId]
+                if (prevStatus != null && prevStatus != order.status) {
+                    when (order.status) {
+                        OrderStatus.ACCEPTED_PREPARING -> {
+                            CanteenNotificationHelper.showStudentOrderStatusNotification(
+                                context,
+                                order,
+                                "🍳 Order #${order.orderNumber} Preparing",
+                                "The kitchen has accepted your order and is cooking your food."
+                            )
+                        }
+                        OrderStatus.READY_FOR_COUNTER -> {
+                            CanteenNotificationHelper.showStudentOrderStatusNotification(
+                                context,
+                                order,
+                                "🎉 Order #${order.orderNumber} Ready for Pickup!",
+                                "Your hot food is ready at the canteen counter. Please collect!"
+                            )
+                        }
+                        OrderStatus.COMPLETED_SETTLED -> {
+                            CanteenNotificationHelper.showStudentOrderStatusNotification(
+                                context,
+                                order,
+                                "✓ Order #${order.orderNumber} Settled",
+                                "Payment completed at counter. Thank you for dining at VIT Canteen!"
+                            )
+                        }
+                        else -> {}
+                    }
+                }
+            }
+        }
+        previousOrderStatusMap = orders.associate { it.orderId to it.status }
+    }
+
+    // 3. Phone Status Bar Notification for Admin Custom Price Proposal
+    var notifiedProposalOrderId by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(pendingPriceProposalOrder) {
+        pendingPriceProposalOrder?.let { proposal ->
+            if (proposal.orderId != notifiedProposalOrderId) {
+                notifiedProposalOrderId = proposal.orderId
+                CanteenNotificationHelper.showCustomPriceNotification(
+                    context,
+                    proposal,
+                    proposal.proposedCustomPrice ?: proposal.totalAmount
+                )
             }
         }
     }
@@ -340,12 +399,12 @@ fun RestaurantApp(viewModel: RestaurantViewModel = viewModel()) {
             onDismiss = { viewModel.dismissPriceAdjustment() }
         )
 
-        // Customer Price Acceptance Dialog (shown when admin proposes a price)
+        // Customer Price Acceptance Dialog
         CustomizationPriceCustomerDialog(
             order = pendingPriceProposalOrder,
             onAcceptCustomPrice = { viewModel.acceptCustomPrice(it) },
             onDeclineCustomPrice = { viewModel.declineCustomPrice(it) },
-            onDismiss = { /* Customer must Accept or Decline */ }
+            onDismiss = { /* Customer can choose to accept or decline */ }
         )
     }
 }

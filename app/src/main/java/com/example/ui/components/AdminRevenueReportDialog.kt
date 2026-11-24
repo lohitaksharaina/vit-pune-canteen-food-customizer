@@ -31,12 +31,10 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -99,21 +97,21 @@ fun AdminRevenueReportDialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
-        Card(
+        Surface(
             modifier = Modifier
                 .fillMaxWidth(0.95f)
-                .heightIn(max = 700.dp)
+                .heightIn(max = 680.dp)
+                .clip(RoundedCornerShape(20.dp))
                 .testTag("admin_revenue_report_dialog"),
-            shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 6.dp
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(20.dp)
             ) {
-                // Header
+                // Header Row
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -122,40 +120,48 @@ fun AdminRevenueReportDialog(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(
                             modifier = Modifier
-                                .size(40.dp)
+                                .size(42.dp)
                                 .clip(RoundedCornerShape(10.dp))
-                                .background(Color(0xFFE65100).copy(alpha = 0.2f)),
+                                .background(Color(0xFF1A237E)),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 imageVector = Icons.Default.PictureAsPdf,
                                 contentDescription = null,
-                                tint = FlameOrange,
+                                tint = Color.White,
                                 modifier = Modifier.size(24.dp)
                             )
                         }
-                        Spacer(modifier = Modifier.width(10.dp))
+                        Spacer(modifier = Modifier.width(12.dp))
                         Column {
                             Text(
-                                text = "Monthly Revenue & Sales Report",
+                                text = "Revenue & Sales Analytics",
                                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                                 color = WarmIvory
                             )
                             Text(
-                                text = "PDF: ${report.fileName}.pdf",
+                                text = "${report.fileName}.pdf • ${report.monthYearStr}",
                                 style = MaterialTheme.typography.labelSmall,
-                                color = FlameOrange
+                                color = MaterialTheme.colorScheme.secondary
                             )
                         }
                     }
+
                     IconButton(onClick = onDismiss) {
-                        Icon(imageVector = Icons.Default.Close, contentDescription = "Close", tint = Color.Gray)
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Close",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 }
 
-                HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = MaterialTheme.colorScheme.outline)
+                HorizontalDivider(
+                    color = MaterialTheme.colorScheme.outlineVariant,
+                    modifier = Modifier.padding(vertical = 12.dp)
+                )
 
-                // Summary Highlights
+                // 4 Key Metric Summary Cards
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -168,14 +174,20 @@ fun AdminRevenueReportDialog(
                     )
                     ReportStatChip(
                         title = "Settled Orders",
-                        value = "${report.totalSettledOrders}",
-                        color = MaterialTheme.colorScheme.secondary,
+                        value = "${report.totalSettledOrders} / ${report.totalOrdersCount}",
+                        color = Color(0xFF64B5F6),
                         modifier = Modifier.weight(1f)
                     )
                     ReportStatChip(
                         title = "GST (5%)",
                         value = "₹${String.format(Locale.getDefault(), "%.1f", report.totalGst)}",
                         color = FlameOrange,
+                        modifier = Modifier.weight(1f)
+                    )
+                    ReportStatChip(
+                        title = "Avg Order",
+                        value = "₹${String.format(Locale.getDefault(), "%.0f", report.averageOrderValue)}",
+                        color = Color(0xFFCE93D8),
                         modifier = Modifier.weight(1f)
                     )
                 }
@@ -192,7 +204,7 @@ fun AdminRevenueReportDialog(
                     // Day-wise revenue list
                     item {
                         Text(
-                            text = "DAY-WISE REVENUE BREAKDOWN",
+                            text = "DAY-WISE REVENUE BREAKDOWN (${report.dayWiseRevenue.size} Days)",
                             style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp),
                             color = MaterialTheme.colorScheme.secondary
                         )
@@ -228,9 +240,9 @@ fun AdminRevenueReportDialog(
 
                     // Per-item sales list
                     item {
-                        Spacer(modifier = Modifier.height(6.dp))
+                        Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "PER-ITEM SALES BREAKDOWN",
+                            text = "PER-ITEM SALES BREAKDOWN (${report.itemSales.size} Dishes)",
                             style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp),
                             color = MaterialTheme.colorScheme.secondary
                         )
@@ -253,7 +265,7 @@ fun AdminRevenueReportDialog(
                                     color = WarmIvory
                                 )
                                 Text(
-                                    text = "Sold: ${itemStat.quantitySold} units",
+                                    text = "Sold: ${itemStat.quantitySold} units (${String.format(Locale.getDefault(), "%.1f", itemStat.percentageOfTotal)}% share)",
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -267,7 +279,8 @@ fun AdminRevenueReportDialog(
                     }
                 }
 
-                if (saveStatusMsg != null) {
+                // Status message indicator
+                if (!saveStatusMsg.isNullOrBlank()) {
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         text = saveStatusMsg ?: "",
@@ -352,15 +365,26 @@ private fun ReportStatChip(
     Card(
         modifier = modifier,
         shape = RoundedCornerShape(10.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f))
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(8.dp)
         ) {
-            Text(text = title, style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(
+                text = title,
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1
+            )
             Spacer(modifier = Modifier.height(2.dp))
-            Text(text = value, style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold), color = color)
+            Text(
+                text = value,
+                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Black),
+                color = color,
+                maxLines = 1
+            )
         }
     }
 }

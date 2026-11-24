@@ -1,5 +1,7 @@
 package com.example.ui.components
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -8,6 +10,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -17,12 +20,8 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.LocalFireDepartment
-import androidx.compose.material.icons.filled.Schedule
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -38,6 +37,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -46,7 +46,6 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.data.model.MenuItem
 import com.example.ui.theme.FlameOrange
-import com.example.ui.theme.SuccessGreen
 import com.example.ui.theme.WarmIvory
 import java.util.Calendar
 
@@ -59,22 +58,29 @@ fun RecommendationsSection(
 ) {
     val currentHour = remember { Calendar.getInstance().get(Calendar.HOUR_OF_DAY) }
 
-    val (timeSlotTitle, timeSlotSubtitle) = remember(currentHour) {
-        when (currentHour) {
-            in 6..11 -> Pair("Morning Nashta Picks", "Fresh & energizing breakfast before morning lectures")
-            in 12..15 -> Pair("Lunch Hour Bestsellers", "Hearty student meals & thalis to power your afternoon")
-            else -> Pair("Evening Bites & Chill", "Hot grilled sandwiches, misal & legendary cold coffee")
+    val (timeSlotTitle, timeSlotSubtitle, recommendedItemIds) = remember(currentHour) {
+        when {
+            currentHour in 7..11 -> Triple(
+                "Fresh Morning Nashta",
+                "Warm Puneri breakfast favorites to start college day",
+                listOf("vit_snack_01", "vit_snack_02", "vit_snack_03", "vit_snack_04", "vit_bev_02")
+            )
+            currentHour in 12..16 -> Triple(
+                "Campus Lunch Specials",
+                "Hearty thalis, combo meals & hot rice bowls",
+                listOf("vit_meal_01", "vit_meal_02", "vit_meal_04", "vit_snack_09", "vit_bev_01")
+            )
+            else -> Triple(
+                "Evening Canteen Bites & Chai",
+                "Crispy snacks, sandwiches & refreshing coolers",
+                listOf("vit_snack_01", "vit_snack_02", "vit_snack_06", "vit_bev_01", "vit_bev_02")
+            )
         }
     }
 
-    // Filter recommended items (featured badges and matching available items)
-    val recommendedList = remember(menuItems, unavailableItemIds, currentHour) {
-        val available = menuItems.filter { !unavailableItemIds.contains(it.id) }
-        when (currentHour) {
-            in 6..11 -> available.filter { it.category.name == "PUNERI_NASHTA" || it.category.name == "SOUTH_INDIAN" || it.id == "vit_bev_02" }
-            in 12..15 -> available.filter { it.category.name == "MEALS_THALI" || it.id == "vit_bev_04" || it.badge != null }
-            else -> available.filter { it.badge != null || it.category.name == "SANDWICH_MAGGI" || it.id == "vit_bev_01" }
-        }.ifEmpty { available.filter { it.badge != null } }.take(6)
+    val recommendedList = remember(menuItems, unavailableItemIds, recommendedItemIds) {
+        val matches = menuItems.filter { it.id in recommendedItemIds && !unavailableItemIds.contains(it.id) }
+        if (matches.isNotEmpty()) matches else menuItems.filter { !unavailableItemIds.contains(it.id) }.take(5)
     }
 
     if (recommendedList.isEmpty()) return
@@ -82,10 +88,10 @@ fun RecommendationsSection(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(vertical = 6.dp)
+            .padding(vertical = 8.dp)
             .testTag("recommendations_section")
     ) {
-        // Section Header
+        // Section Title with Clock / Sparkle icon
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -98,14 +104,18 @@ fun RecommendationsSection(
                     modifier = Modifier
                         .size(30.dp)
                         .clip(RoundedCornerShape(8.dp))
-                        .background(FlameOrange.copy(alpha = 0.2f)),
+                        .background(
+                            Brush.linearGradient(
+                                listOf(FlameOrange.copy(alpha = 0.3f), FlameOrange.copy(alpha = 0.1f))
+                            )
+                        ),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = Icons.Default.AutoAwesome,
                         contentDescription = null,
                         tint = FlameOrange,
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(16.dp)
                     )
                 }
                 Spacer(modifier = Modifier.width(8.dp))
@@ -126,12 +136,16 @@ fun RecommendationsSection(
             Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(6.dp))
-                    .background(Color(0xFF2E1C0A))
-                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                    .background(Color(0xFF331A00))
+                    .padding(horizontal = 8.dp, vertical = 3.dp)
             ) {
                 Text(
-                    text = "TOP PICKS",
-                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, fontWeight = FontWeight.Black),
+                    text = "CHEF PICKS",
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Black,
+                        letterSpacing = 0.5.sp
+                    ),
                     color = FlameOrange
                 )
             }
@@ -162,75 +176,96 @@ fun RecommendedDishCard(
 ) {
     Card(
         modifier = modifier
-            .width(180.dp)
-            .clip(RoundedCornerShape(14.dp))
+            .width(170.dp)
+            .clip(RoundedCornerShape(16.dp))
             .clickable { onCustomiseClick(item) }
             .testTag("recommended_card_${item.id}"),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, Color(0x1FFFFFFF)),
         elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
-            // Food Image
+            // Food Image with robust fallback
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(100.dp)
+                    .height(105.dp)
             ) {
-                if (!item.imageUrl.isNullOrBlank()) {
+                // Background category gradient
+                FoodCategoryPlaceholder(
+                    category = item.category,
+                    dishName = item.name,
+                    modifier = Modifier.fillMaxSize()
+                )
+
+                // High-res local drawable priority
+                if (item.drawableResId != null) {
+                    Image(
+                        painter = painterResource(id = item.drawableResId),
+                        contentDescription = item.name,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else if (!item.imageUrl.isNullOrBlank()) {
                     AsyncImage(
                         model = ImageRequest.Builder(LocalContext.current)
                             .data(item.imageUrl)
                             .crossfade(true)
-                            .error(item.drawableResId ?: android.R.drawable.ic_menu_gallery)
                             .build(),
                         contentDescription = item.name,
                         contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxSize()
                     )
-                } else {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(Color(0xFF2C1E18)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.LocalFireDepartment,
-                            contentDescription = null,
-                            tint = FlameOrange.copy(alpha = 0.4f),
-                            modifier = Modifier.size(36.dp)
-                        )
-                    }
                 }
 
-                // Veg symbol & Badge
-                Row(
+                // Vignette gradient
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(6.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                        .height(45.dp)
+                        .align(Alignment.BottomCenter)
+                        .background(
+                            Brush.verticalGradient(
+                                listOf(Color.Transparent, Color(0xCC141211))
+                            )
+                        )
+                )
+
+                // Veg symbol
+                Box(
+                    modifier = Modifier
+                        .padding(6.dp)
+                        .align(Alignment.TopStart)
                 ) {
                     VegNonVegSymbol(isVeg = item.isVeg)
-                    if (item.badge != null) {
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(4.dp))
-                                .background(Color(0xE6E65100))
-                                .padding(horizontal = 5.dp, vertical = 2.dp)
-                        ) {
-                            Text(
-                                text = item.badge,
-                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.sp, fontWeight = FontWeight.Bold),
-                                color = Color.White
-                            )
-                        }
-                    }
+                }
+
+                // Price pill
+                Box(
+                    modifier = Modifier
+                        .padding(6.dp)
+                        .align(Alignment.BottomEnd)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(Color(0xE6141211))
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                ) {
+                    Text(
+                        text = "₹${item.price.toInt()}",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontWeight = FontWeight.ExtraBold,
+                            color = FlameOrange,
+                            fontSize = 11.sp
+                        )
+                    )
                 }
             }
 
-            // Info & Add Action
-            Column(modifier = Modifier.padding(10.dp)) {
+            // Info section
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(10.dp)
+            ) {
                 Text(
                     text = item.name,
                     style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
@@ -241,37 +276,13 @@ fun RecommendedDishCard(
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = item.category.title,
-                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontSize = 10.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    ),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
-
-                Spacer(modifier = Modifier.height(6.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "₹${item.price.toInt()}",
-                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Black),
-                        color = SuccessGreen
-                    )
-
-                    Button(
-                        onClick = { onCustomiseClick(item) },
-                        modifier = Modifier
-                            .height(28.dp)
-                            .testTag("rec_add_btn_${item.id}"),
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
-                        shape = RoundedCornerShape(8.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = FlameOrange)
-                    ) {
-                        Icon(imageVector = Icons.Default.Add, contentDescription = null, modifier = Modifier.size(12.dp), tint = Color.White)
-                        Spacer(modifier = Modifier.width(3.dp))
-                        Text(text = "Add", style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp, fontWeight = FontWeight.Bold), color = Color.White)
-                    }
-                }
             }
         }
     }
