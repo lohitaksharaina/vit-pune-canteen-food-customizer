@@ -3,13 +3,17 @@ package com.example.data.repository
 import android.content.Context
 import android.util.Log
 import com.example.data.model.CustomisedOrderItem
+import com.example.data.model.CustomizationPricingStatus
 import com.example.data.model.OrderStatus
 import com.example.data.model.RestaurantOrder
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -27,6 +31,12 @@ class OrderRepository private constructor() {
 
     private val _cart = MutableStateFlow<List<CustomisedOrderItem>>(emptyList())
     val cart: StateFlow<List<CustomisedOrderItem>> = _cart.asStateFlow()
+
+    private val _unavailableItemIds = MutableStateFlow<Set<String>>(emptySet())
+    val unavailableItemIds: StateFlow<Set<String>> = _unavailableItemIds.asStateFlow()
+
+    private val _newOrderEvents = MutableSharedFlow<RestaurantOrder>(extraBufferCapacity = 64)
+    val newOrderEvents: SharedFlow<RestaurantOrder> = _newOrderEvents.asSharedFlow()
 
     private val _syncChannel = MutableStateFlow("VIT-PUNE-CANTEEN")
     val syncChannel: StateFlow<String> = _syncChannel.asStateFlow()
@@ -70,6 +80,7 @@ class OrderRepository private constructor() {
                 scope.launch {
                     firestoreRepo?.seedMenuCatalogIfEmpty()
                     listenToFirestoreOrders()
+                    listenToFirestoreAvailability()
                 }
             } catch (e: Exception) {
                 Log.w(TAG, "Failed to initialize Firestore", e)
@@ -83,6 +94,13 @@ class OrderRepository private constructor() {
             try {
                 repo.observeOrdersRealtime(_syncChannel.value).collect { remoteOrders ->
                     if (remoteOrders.isNotEmpty()) {
+                        val existingIds = _orders.value.map { it.orderId }.toSet()
+                        // Check for new incoming orders to trigger notifications
+                        remoteOrders.forEach { remote ->
+                            if (!existingIds.contains(remote.orderId) && remote.status == OrderStatus.RECEIVED) {
+                                _newOrderEvents.tryEmit(remote)
+                            }
+                        }
                         // Merge remote orders with local list
                         val currentMap = _orders.value.associateBy { it.orderId }.toMutableMap()
                         remoteOrders.forEach { remote ->
@@ -93,6 +111,19 @@ class OrderRepository private constructor() {
                 }
             } catch (e: Exception) {
                 Log.w(TAG, "Error in Firestore real-time observation", e)
+            }
+        }
+    }
+
+    private fun listenToFirestoreAvailability() {
+        val repo = firestoreRepo ?: return
+        scope.launch {
+            try {
+                repo.observeUnavailableItemsRealtime(_syncChannel.value).collect { ids ->
+                    _unavailableItemIds.value = ids
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Error in Firestore availability observation", e)
             }
         }
     }
@@ -175,6 +206,7 @@ class OrderRepository private constructor() {
         updated.add(0, newOrder)
         _orders.value = updated
         clearCart()
+        _newOrderEvents.tryEmit(newOrder)
 
         // Sync to Firestore in real-time
         firestoreRepo?.let { repo ->
@@ -273,6 +305,68 @@ class OrderRepository private constructor() {
         }
 
         return removed
+    }
+
+    fun toggleItemAvailability(itemId: String) {
+        val current = _unavailableItemIds.value
+        val updated = if (current.contains(itemId)) current - itemId else current + itemId
+        _unavailableItemIds.value = updated
+        firestoreRepo?.let { repo ->
+            scope.launch {
+                repo.syncUnavailableItems(_syncChannel.value, updated)
+            }
+        }
+    }
+
+    fun proposeCustomPrice(orderId: String, newPrice: Double, note: String) {
+        _orders.value = _orders.value.map { order ->
+            if (order.orderId == orderId) {
+                order.copy(
+                    customizationPricingStatus = CustomizationPricingStatus.PRICE_PROPOSED_BY_ADMIN,
+                    proposedCustomPrice = newPrice,
+                    priceAdjustmentNote = note
+                )
+            } else order
+        }
+        firestoreRepo?.let { repo ->
+            scope.launch {
+                repo.proposeCustomPrice(orderId, newPrice, note)
+            }
+        }
+    }
+
+    fun respondToCustomPrice(orderId: String, accept: Boolean) {
+        val target = _orders.value.find { it.orderId == orderId } ?: return
+        val proposedPrice = target.proposedCustomPrice
+        _orders.value = _orders.value.map { order ->
+            if (order.orderId == orderId) {
+                if (accept && proposedPrice != null && proposedPrice > 0) {
+                    val newGst = proposedPrice * 0.05
+                    val newTotal = proposedPrice + newGst
+                    order.copy(
+                        customizationPricingStatus = CustomizationPricingStatus.ACCEPTED_BY_CUSTOMER,
+                        subtotal = proposedPrice,
+                        gst = newGst,
+                        totalAmount = newTotal,
+                        isCustomizedFoodActive = true
+                    )
+                } else {
+                    order.copy(
+                        customizationPricingStatus = CustomizationPricingStatus.DECLINED_BY_CUSTOMER,
+                        isCustomizedFoodActive = false
+                    )
+                }
+            } else order
+        }
+        firestoreRepo?.let { repo ->
+            scope.launch {
+                repo.respondToCustomPrice(orderId, accept, proposedPrice, target.subtotal)
+            }
+        }
+    }
+
+    suspend fun uploadMonthlyReport(reportData: Map<String, Any>): String {
+        return firestoreRepo?.uploadMonthlyReport(_syncChannel.value, reportData) ?: ""
     }
 
     fun setSyncChannel(channel: String) {

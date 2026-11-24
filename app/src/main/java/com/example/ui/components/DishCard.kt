@@ -39,6 +39,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalContext
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.example.data.model.MenuItem
 import com.example.ui.theme.FlameOrange
 import com.example.ui.theme.NonVegRed
@@ -70,7 +73,18 @@ fun DishCard(
                     .fillMaxWidth()
                     .height(145.dp)
             ) {
-                if (item.drawableResId != null) {
+                if (!item.imageUrl.isNullOrBlank()) {
+                    AsyncImage(
+                        model = ImageRequest.Builder(LocalContext.current)
+                            .data(item.imageUrl)
+                            .crossfade(true)
+                            .error(item.drawableResId ?: android.R.drawable.ic_menu_gallery)
+                            .build(),
+                        contentDescription = item.name,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                } else if (item.drawableResId != null) {
                     Image(
                         painter = painterResource(id = item.drawableResId),
                         contentDescription = item.name,

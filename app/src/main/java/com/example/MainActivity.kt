@@ -1,9 +1,13 @@
 package com.example
 
+import android.Manifest
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
@@ -28,6 +32,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -35,7 +40,10 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.ui.admin.AdminDashboardScreen
 import com.example.ui.auth.LoginScreen
 import com.example.ui.chef.ChefDashboardScreen
+import com.example.ui.components.AdminPriceAdjustmentDialog
+import com.example.ui.components.AdminRevenueReportDialog
 import com.example.ui.components.CustomerFeedbackDialog
+import com.example.ui.components.CustomizationPriceCustomerDialog
 import com.example.ui.components.DigitalBillDialog
 import com.example.ui.components.DishCustomiserDialog
 import com.example.ui.components.OnlineSyncDialog
@@ -47,10 +55,12 @@ import com.example.ui.theme.MyApplicationTheme
 import com.example.ui.theme.WarmIvory
 import com.example.ui.viewmodel.AppMode
 import com.example.ui.viewmodel.RestaurantViewModel
+import com.example.util.CanteenNotificationHelper
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        CanteenNotificationHelper.createNotificationChannel(this)
         enableEdgeToEdge()
         setContent {
             MyApplicationTheme {
@@ -62,6 +72,7 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun RestaurantApp(viewModel: RestaurantViewModel = viewModel()) {
+    val context = LocalContext.current
     val currentUser by viewModel.currentUser.collectAsStateWithLifecycle()
     val currentMode by viewModel.currentMode.collectAsStateWithLifecycle()
     val unavailableItemIds by viewModel.unavailableItemIds.collectAsStateWithLifecycle()
@@ -104,10 +115,34 @@ fun RestaurantApp(viewModel: RestaurantViewModel = viewModel()) {
     val feedbackSubmitted by viewModel.feedbackSubmitted.collectAsStateWithLifecycle()
 
     val userEmail by viewModel.userEmail.collectAsStateWithLifecycle()
-    val context = androidx.compose.ui.platform.LocalContext.current
+
+    // New feature states
+    val isRevenueReportOpen by viewModel.isRevenueReportOpen.collectAsStateWithLifecycle()
+    val activeRevenueReport by viewModel.activeRevenueReport.collectAsStateWithLifecycle()
+    val priceAdjustmentTargetOrder by viewModel.priceAdjustmentTargetOrder.collectAsStateWithLifecycle()
+    val pendingPriceProposalOrder by viewModel.pendingPriceProposalOrder.collectAsStateWithLifecycle()
 
     LaunchedEffect(Unit) {
         viewModel.initFirestore(context)
+    }
+
+    // Request POST_NOTIFICATIONS permission on Android 13+
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { /* no-op — user may deny */ }
+    LaunchedEffect(currentUser) {
+        if (currentUser != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
+
+    // Show notification for CHEF / ADMIN when a new order arrives
+    LaunchedEffect(Unit) {
+        viewModel.notifyNewOrder.collect { order ->
+            if (currentMode == AppMode.CHEF || currentMode == AppMode.ADMIN) {
+                CanteenNotificationHelper.showNewOrderNotification(context, order)
+            }
+        }
     }
 
     val statusMessage by viewModel.statusBannerMessage.collectAsStateWithLifecycle()
@@ -208,7 +243,9 @@ fun RestaurantApp(viewModel: RestaurantViewModel = viewModel()) {
                         onResetWaitlistOrders = { viewModel.resetWaitlistOrders() },
                         onTriggerAutoPurge = { viewModel.triggerAutoPurgeNow() },
                         onSwitchToStudentView = { viewModel.setMode(AppMode.CUSTOMER) },
-                        onSwitchToCookView = { viewModel.setMode(AppMode.CHEF) }
+                        onSwitchToCookView = { viewModel.setMode(AppMode.CHEF) },
+                        onGenerateRevenueReport = { viewModel.generateRevenueReport(context) },
+                        onSetCustomPrice = { viewModel.openPriceAdjustmentForOrder(it) }
                     )
                 }
             }
@@ -284,6 +321,31 @@ fun RestaurantApp(viewModel: RestaurantViewModel = viewModel()) {
             isSubmitted = feedbackSubmitted,
             onSubmit = { viewModel.submitFeedback() },
             onDismiss = { viewModel.dismissFeedback() }
+        )
+
+        // Admin Revenue Report Dialog
+        AdminRevenueReportDialog(
+            isOpen = isRevenueReportOpen,
+            report = activeRevenueReport,
+            onUploadToFirebase = { report -> viewModel.uploadRevenueReport(report) },
+            onDismiss = { viewModel.dismissRevenueReport() }
+        )
+
+        // Admin Custom Price Proposal Dialog
+        AdminPriceAdjustmentDialog(
+            order = priceAdjustmentTargetOrder,
+            onProposePrice = { orderId, price, note ->
+                viewModel.proposePriceForOrder(orderId, price, note)
+            },
+            onDismiss = { viewModel.dismissPriceAdjustment() }
+        )
+
+        // Customer Price Acceptance Dialog (shown when admin proposes a price)
+        CustomizationPriceCustomerDialog(
+            order = pendingPriceProposalOrder,
+            onAcceptCustomPrice = { viewModel.acceptCustomPrice(it) },
+            onDeclineCustomPrice = { viewModel.declineCustomPrice(it) },
+            onDismiss = { /* Customer must Accept or Decline */ }
         )
     }
 }

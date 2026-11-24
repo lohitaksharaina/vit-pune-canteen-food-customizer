@@ -7,6 +7,13 @@ enum class OrderStatus(val label: String, val stepIndex: Int) {
     COMPLETED_SETTLED("Counter Paid & Settled", 3)
 }
 
+enum class CustomizationPricingStatus(val label: String) {
+    NONE("Standard Price"),
+    PRICE_PROPOSED_BY_ADMIN("Price Review Proposed"),
+    ACCEPTED_BY_CUSTOMER("Customer Accepted Custom Price"),
+    DECLINED_BY_CUSTOMER("Customer Declined (Normal Food)")
+}
+
 data class RestaurantOrder(
     val orderId: String,
     val orderNumber: Int, // e.g. 101, 102...
@@ -21,8 +28,15 @@ data class RestaurantOrder(
     val isPaidAtCounter: Boolean = false,
     val createdAt: Long = System.currentTimeMillis(),
     val completedAt: Long? = null,
-    val chefNotes: String? = null
+    val chefNotes: String? = null,
+    val customizationPricingStatus: CustomizationPricingStatus = CustomizationPricingStatus.NONE,
+    val proposedCustomPrice: Double? = null,
+    val priceAdjustmentNote: String? = null,
+    val isCustomizedFoodActive: Boolean = true
 ) {
     val totalItemsCount: Int
         get() = items.sumOf { it.quantity }
+
+    val hasCustomizations: Boolean
+        get() = items.any { it.dislikedIngredients.isNotEmpty() || it.chefNote.isNotBlank() || it.spicePreference != "Normal" }
 }

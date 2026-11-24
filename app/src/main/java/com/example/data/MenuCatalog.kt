@@ -15,6 +15,7 @@ object MenuCatalog {
             price = 50.0,
             isVeg = true,
             drawableResId = R.drawable.vit_misal_pav_1794233551945,
+            imageUrl = "https://images.unsplash.com/photo-1601050690597-df0568f70950?auto=format&fit=crop&w=600&q=80",
             spiciness = 3,
             badge = "VIT Student Favorite",
             dislikableIngredients = listOf(
@@ -34,6 +35,7 @@ object MenuCatalog {
             price = 25.0,
             isVeg = true,
             drawableResId = R.drawable.vit_vada_pav_1794233566141,
+            imageUrl = "https://images.unsplash.com/photo-1606491956689-2ea866880c84?auto=format&fit=crop&w=600&q=80",
             spiciness = 2,
             badge = "College Daily Classic",
             dislikableIngredients = listOf(
@@ -51,6 +53,7 @@ object MenuCatalog {
             description = "Traditional Maharashtrian flattened rice cooked with fried onions, mustard seeds, turmeric, roasted crunchy peanuts, fresh coriander and nylon sev.",
             price = 30.0,
             isVeg = true,
+            imageUrl = "https://images.unsplash.com/photo-1630409346824-4f0e7b080087?auto=format&fit=crop&w=600&q=80",
             spiciness = 1,
             badge = "Morning Nashta",
             dislikableIngredients = listOf(
@@ -69,6 +72,7 @@ object MenuCatalog {
             description = "Fluffy sago pearls sautéed with roasted crushed peanuts, cumin seeds, green chillies, and potatoes, served with fresh sweetened curd.",
             price = 45.0,
             isVeg = true,
+            imageUrl = "https://images.unsplash.com/photo-1601050690187-573574972e0a?auto=format&fit=crop&w=600&q=80",
             spiciness = 1,
             badge = "Fast & Upvas",
             dislikableIngredients = listOf(
@@ -85,6 +89,7 @@ object MenuCatalog {
             description = "Golden flaky pastry filled with cumin-spiced mashed potatoes and green peas, served with sweet tamarind and spicy mint coriander chutney.",
             price = 35.0,
             isVeg = true,
+            imageUrl = "https://images.unsplash.com/photo-1601050690597-df0568f70950?auto=format&fit=crop&w=600&q=80",
             spiciness = 2,
             badge = "Evening Snack",
             dislikableIngredients = listOf(
@@ -104,6 +109,7 @@ object MenuCatalog {
             description = "Triple layered bread stuffed with cucumber, juicy tomatoes, capsicum, mint butter spread, topped with melted Amul cheese, grilled till crisp.",
             price = 70.0,
             isVeg = true,
+            imageUrl = "https://images.unsplash.com/photo-1528735602780-2552fd46c7af?auto=format&fit=crop&w=600&q=80",
             spiciness = 1,
             badge = "Campus Bestseller",
             dislikableIngredients = listOf(
@@ -121,6 +127,7 @@ object MenuCatalog {
             description = "Steaming hot canteen special 2-minute noodles tossed with butter, diced onions, green chillies, and double tastemaker seasoning.",
             price = 40.0,
             isVeg = true,
+            imageUrl = "https://images.unsplash.com/photo-1612927601601-6638404737ce?auto=format&fit=crop&w=600&q=80",
             spiciness = 2,
             badge = "Hostel & Canteen Hero",
             dislikableIngredients = listOf(
@@ -138,6 +145,7 @@ object MenuCatalog {
             description = "Double masala Maggi smothered in generous grated Amul cheese with hot butter glaze.",
             price = 55.0,
             isVeg = true,
+            imageUrl = "https://images.unsplash.com/photo-1612927601601-6638404737ce?auto=format&fit=crop&w=600&q=80",
             spiciness = 1,
             badge = "Cheesy Delight",
             dislikableIngredients = listOf(
@@ -154,6 +162,7 @@ object MenuCatalog {
             description = "Slow-cooked mashed vegetable curry blended with authentic Pune spices, served with 2 warm butter pavs and chopped onion-lemon salad.",
             price = 90.0,
             isVeg = true,
+            imageUrl = "https://images.unsplash.com/photo-1606491956689-2ea866880c84?auto=format&fit=crop&w=600&q=80",
             spiciness = 2,
             badge = "Special Treat",
             dislikableIngredients = listOf(
@@ -171,6 +180,7 @@ object MenuCatalog {
             description = "Crispy triangular gram flour coated bread pockets stuffed with spiced potato masala, served with green chilli thecha.",
             price = 35.0,
             isVeg = true,
+            imageUrl = "https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=600&q=80",
             spiciness = 2,
             dislikableIngredients = listOf(
                 "Green Thecha",
@@ -189,6 +199,7 @@ object MenuCatalog {
             price = 95.0,
             isVeg = true,
             drawableResId = R.drawable.vit_student_thali_1794233595020,
+            imageUrl = "https://images.unsplash.com/photo-1610057099443-fde8c4d50f91?auto=format&fit=crop&w=600&q=80",
             spiciness = 1,
             badge = "Full Lunch Meal",
             dislikableIngredients = listOf(
@@ -207,6 +218,7 @@ object MenuCatalog {
             description = "2 Chapatis, homestyle Dal fry, daily vegetable bhaji, steamed basmati rice, and lemon pickle.",
             price = 65.0,
             isVeg = true,
+            imageUrl = "https://images.unsplash.com/photo-1546833999-b9f581a1996d?auto=format&fit=crop&w=600&q=80",
             spiciness = 1,
             badge = "Quick Lunch",
             dislikableIngredients = listOf(
@@ -223,6 +235,7 @@ object MenuCatalog {
             description = "Hearty comfort dish of yellow lentils and rice tempered with desi ghee, cumin, burnt garlic, and dry red chillies.",
             price = 75.0,
             isVeg = true,
+            imageUrl = "https://images.unsplash.com/photo-1546833999-b9f581a1996d?auto=format&fit=crop&w=600&q=80",
             spiciness = 1,
             badge = "Comfort Food",
             dislikableIngredients = listOf(
@@ -239,6 +252,7 @@ object MenuCatalog {
             description = "Tender cottage cheese cubes simmered in spiced onion-tomato gravy, served with 3 warm chapatis.",
             price = 85.0,
             isVeg = true,
+            imageUrl = "https://images.unsplash.com/photo-1567188040759-fb8a883dc6d8?auto=format&fit=crop&w=600&q=80",
             spiciness = 2,
             dislikableIngredients = listOf(
                 "Dairy Cream",
@@ -254,6 +268,7 @@ object MenuCatalog {
             description = "Long grain basmati rice tossed with fresh carrots, green beans, peas, and whole spices, served with seasoned boondi curd.",
             price = 70.0,
             isVeg = true,
+            imageUrl = "https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?auto=format&fit=crop&w=600&q=80",
             spiciness = 1,
             dislikableIngredients = listOf(
                 "Whole Spices (Cloves/Cardamom)",
@@ -271,6 +286,7 @@ object MenuCatalog {
             description = "Thin fermented rice crepe roasted on cast iron with butter, stuffed with spiced mustard potato filling, served with piping hot sambar & coconut chutney.",
             price = 60.0,
             isVeg = true,
+            imageUrl = "https://images.unsplash.com/photo-1668236543090-82eba5ee5976?auto=format&fit=crop&w=600&q=80",
             spiciness = 1,
             badge = "Fresh Off The Tawa",
             dislikableIngredients = listOf(
@@ -288,6 +304,7 @@ object MenuCatalog {
             description = "Soft steamed rice and urad dal cakes served with spiced lentil vegetable sambar and freshly grated coconut chutney.",
             price = 40.0,
             isVeg = true,
+            imageUrl = "https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=600&q=80",
             spiciness = 0,
             badge = "Healthy Nashta",
             dislikableIngredients = listOf(
@@ -304,6 +321,7 @@ object MenuCatalog {
             description = "Golden crispy savoury lentil doughnuts served with hot drumstick sambar and fresh coconut dip.",
             price = 45.0,
             isVeg = true,
+            imageUrl = "https://images.unsplash.com/photo-1626777552726-4a6b54c97e46?auto=format&fit=crop&w=600&q=80",
             spiciness = 1,
             dislikableIngredients = listOf(
                 "Black Pepper in Vada",
@@ -321,6 +339,7 @@ object MenuCatalog {
             description = "Wok-tossed noodles with shredded cabbage, bell peppers, carrots, spring onions in soy and garlic sauce.",
             price = 80.0,
             isVeg = true,
+            imageUrl = "https://images.unsplash.com/photo-1585032226651-759b368d7246?auto=format&fit=crop&w=600&q=80",
             spiciness = 2,
             badge = "Student Fast Food",
             dislikableIngredients = listOf(
@@ -338,6 +357,7 @@ object MenuCatalog {
             description = "Fiery basmati rice tossed with crunchy vegetables in hot red Schezwan pepper sauce and aromatic garlic.",
             price = 85.0,
             isVeg = true,
+            imageUrl = "https://images.unsplash.com/photo-1603133872878-684f208fb84b?auto=format&fit=crop&w=600&q=80",
             spiciness = 3,
             badge = "Spicy Wok",
             dislikableIngredients = listOf(
@@ -354,6 +374,7 @@ object MenuCatalog {
             description = "Crisp vegetable dumplings in dark savoury soy-garlic gravy served with hot veg fried rice.",
             price = 110.0,
             isVeg = true,
+            imageUrl = "https://images.unsplash.com/photo-1569058242252-623df46b5025?auto=format&fit=crop&w=600&q=80",
             spiciness = 2,
             badge = "Canteen Combo",
             dislikableIngredients = listOf(
@@ -373,6 +394,7 @@ object MenuCatalog {
             price = 40.0,
             isVeg = true,
             drawableResId = R.drawable.vit_cold_coffee_1794233579575,
+            imageUrl = "https://images.unsplash.com/photo-1517701604599-bb29b565090c?auto=format&fit=crop&w=600&q=80",
             spiciness = 0,
             badge = "Pune College Legend",
             dislikableIngredients = listOf(
@@ -388,6 +410,7 @@ object MenuCatalog {
             description = "Piping hot aromatic milk tea brewed with fresh crushed ginger, green cardamom, and high-grown CTC tea.",
             price = 15.0,
             isVeg = true,
+            imageUrl = "https://images.unsplash.com/photo-1576092768241-dec231879fc3?auto=format&fit=crop&w=600&q=80",
             spiciness = 0,
             badge = "Chai Tapri Special",
             dislikableIngredients = listOf(
@@ -403,6 +426,7 @@ object MenuCatalog {
             description = "Freshly brewed chicory coffee decoction frothed with boiling whole milk in a stainless steel cup.",
             price = 20.0,
             isVeg = true,
+            imageUrl = "https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?auto=format&fit=crop&w=600&q=80",
             spiciness = 0,
             dislikableIngredients = listOf(
                 "Excess Sugar",
@@ -416,6 +440,7 @@ object MenuCatalog {
             description = "Traditional Maharashtrian churned curd spiced with roasted cumin, rock salt, ginger, and fresh coriander.",
             price = 20.0,
             isVeg = true,
+            imageUrl = "https://images.unsplash.com/photo-1550547660-d9450f859349?auto=format&fit=crop&w=600&q=80",
             spiciness = 1,
             badge = "Cooling Digestif",
             dislikableIngredients = listOf(
@@ -432,6 +457,7 @@ object MenuCatalog {
             description = "Chilled sparkling soda water infused with freshly squeezed lemon juice, black salt, and sugar syrup.",
             price = 30.0,
             isVeg = true,
+            imageUrl = "https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?auto=format&fit=crop&w=600&q=80",
             spiciness = 0,
             dislikableIngredients = listOf(
                 "Black Salt",
@@ -446,6 +472,7 @@ object MenuCatalog {
             description = "Refreshing tangy-sweet kokum extract cooler with roasted cumin and crushed ice.",
             price = 25.0,
             isVeg = true,
+            imageUrl = "https://images.unsplash.com/photo-1536935338788-846bb9981813?auto=format&fit=crop&w=600&q=80",
             spiciness = 0,
             badge = "Konkan Special",
             dislikableIngredients = listOf(
@@ -462,6 +489,7 @@ object MenuCatalog {
             description = "Warm fried mawa dumplings soaked in saffron and cardamom sugar syrup.",
             price = 35.0,
             isVeg = true,
+            imageUrl = "https://images.unsplash.com/photo-1589119908995-c6837fa14848?auto=format&fit=crop&w=600&q=80",
             spiciness = 0,
             badge = "Sweet Tooth",
             dislikableIngredients = listOf(
@@ -476,6 +504,7 @@ object MenuCatalog {
             description = "Chilled dessert cup to wrap up canteen lunch or snacks.",
             price = 30.0,
             isVeg = true,
+            imageUrl = "https://images.unsplash.com/photo-1497034825429-c343d7c6a68f?auto=format&fit=crop&w=600&q=80",
             spiciness = 0,
             dislikableIngredients = listOf(
                 "Chocolate Sauce"

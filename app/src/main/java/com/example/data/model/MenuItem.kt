@@ -19,6 +19,7 @@ data class MenuItem(
     val price: Double,
     val isVeg: Boolean,
     val drawableResId: Int? = null,
+    val imageUrl: String? = null,
     val spiciness: Int = 1, // 0 = mild, 1 = medium, 2 = spicy, 3 = extra fiery
     val badge: String? = null,
     val dislikableIngredients: List<String> = defaultDislikableIngredients()

@@ -7,16 +7,22 @@ import androidx.lifecycle.viewModelScope
 import com.example.auth.AuthManager
 import com.example.data.MenuCatalog
 import com.example.data.model.CustomisedOrderItem
+import com.example.data.model.CustomizationPricingStatus
 import com.example.data.model.MenuCategory
 import com.example.data.model.MenuItem
 import com.example.data.model.OrderStatus
 import com.example.data.model.RestaurantOrder
 import com.example.data.repository.OrderRepository
+import com.example.util.MonthlyRevenueReport
+import com.example.util.RevenueReportGenerator
 import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
@@ -44,9 +50,8 @@ class RestaurantViewModel : ViewModel() {
     private val _currentMode = MutableStateFlow(AppMode.CUSTOMER)
     val currentMode: StateFlow<AppMode> = _currentMode.asStateFlow()
 
-    // Menu Stock / Availability Management (Items marked out of stock by Admin)
-    private val _unavailableItemIds = MutableStateFlow<Set<String>>(emptySet())
-    val unavailableItemIds: StateFlow<Set<String>> = _unavailableItemIds.asStateFlow()
+    // Menu Stock / Availability Management — synced from Firestore via Repository
+    val unavailableItemIds: StateFlow<Set<String>> = repository.unavailableItemIds
 
     // Authenticated Google Account for Cloud Sync
     private val _userEmail = MutableStateFlow<String?>(Firebase.auth.currentUser?.email ?: AuthManager.TARGET_GMAIL)
@@ -168,9 +173,42 @@ class RestaurantViewModel : ViewModel() {
     private val _feedbackSubmitted = MutableStateFlow(false)
     val feedbackSubmitted: StateFlow<Boolean> = _feedbackSubmitted.asStateFlow()
 
+    // Notification events for new orders (CHEF / ADMIN will trigger push notifications)
+    private val _notifyNewOrder = MutableSharedFlow<RestaurantOrder>(extraBufferCapacity = 64)
+    val notifyNewOrder: SharedFlow<RestaurantOrder> = _notifyNewOrder.asSharedFlow()
+
+    // Revenue report state
+    private val _activeRevenueReport = MutableStateFlow<MonthlyRevenueReport?>(null)
+    val activeRevenueReport: StateFlow<MonthlyRevenueReport?> = _activeRevenueReport.asStateFlow()
+
+    private val _isRevenueReportOpen = MutableStateFlow(false)
+    val isRevenueReportOpen: StateFlow<Boolean> = _isRevenueReportOpen.asStateFlow()
+
+    // Custom price proposal state (Admin proposes → Customer sees)
+    private val _priceAdjustmentTargetOrder = MutableStateFlow<RestaurantOrder?>(null)
+    val priceAdjustmentTargetOrder: StateFlow<RestaurantOrder?> = _priceAdjustmentTargetOrder.asStateFlow()
+
+    private val _pendingPriceProposalOrder = MutableStateFlow<RestaurantOrder?>(null)
+    val pendingPriceProposalOrder: StateFlow<RestaurantOrder?> = _pendingPriceProposalOrder.asStateFlow()
+
     fun initFirestore(context: Context) {
         repository.initFirestore(context)
         _userEmail.value = Firebase.auth.currentUser?.email ?: AuthManager.TARGET_GMAIL
+        // Listen for new order events and forward for notification
+        viewModelScope.launch {
+            repository.newOrderEvents.collect { order ->
+                _notifyNewOrder.tryEmit(order)
+            }
+        }
+        // Track pending price proposals for STUDENT users
+        viewModelScope.launch {
+            repository.orders.collect { orderList ->
+                val proposed = orderList.firstOrNull {
+                    it.customizationPricingStatus == CustomizationPricingStatus.PRICE_PROPOSED_BY_ADMIN
+                }
+                _pendingPriceProposalOrder.value = proposed
+            }
+        }
     }
 
     fun signInWithGoogle(context: Context) {
@@ -469,17 +507,62 @@ class RestaurantViewModel : ViewModel() {
         showTransientStatus("Logged out $name. Demo login active.")
     }
 
-    // Availability / Stock Toggles for Admin
+    // Availability / Stock Toggles for Admin — synced to Firestore
     fun toggleItemAvailability(itemId: String) {
-        val current = _unavailableItemIds.value.toMutableSet()
-        if (current.contains(itemId)) {
-            current.remove(itemId)
+        val isCurrentlyUnavailable = unavailableItemIds.value.contains(itemId)
+        repository.toggleItemAvailability(itemId)
+        if (isCurrentlyUnavailable) {
             showTransientStatus("Item marked In Stock.")
         } else {
-            current.add(itemId)
             showTransientStatus("Item marked Sold Out (Unavailable).")
         }
-        _unavailableItemIds.value = current
+    }
+
+    // Revenue Report
+    fun generateRevenueReport(context: Context) {
+        viewModelScope.launch {
+            val report = RevenueReportGenerator.calculateMonthlyReport(context, orders.value)
+            _activeRevenueReport.value = report
+            _isRevenueReportOpen.value = true
+        }
+    }
+
+    fun dismissRevenueReport() {
+        _isRevenueReportOpen.value = false
+    }
+
+    fun uploadRevenueReport(report: MonthlyRevenueReport) {
+        viewModelScope.launch {
+            repository.uploadMonthlyReport(report.toFirestoreMap())
+            showTransientStatus("Report ${report.fileName} uploaded to Firebase!")
+        }
+    }
+
+    // Custom Price Proposal (Admin → Customer)
+    fun openPriceAdjustmentForOrder(order: RestaurantOrder) {
+        _priceAdjustmentTargetOrder.value = order
+    }
+
+    fun dismissPriceAdjustment() {
+        _priceAdjustmentTargetOrder.value = null
+    }
+
+    fun proposePriceForOrder(orderId: String, newPrice: Double, note: String) {
+        repository.proposeCustomPrice(orderId, newPrice, note)
+        _priceAdjustmentTargetOrder.value = null
+        showTransientStatus("Price proposal sent to customer for Order #$orderId")
+    }
+
+    fun acceptCustomPrice(orderId: String) {
+        repository.respondToCustomPrice(orderId, true)
+        _pendingPriceProposalOrder.value = null
+        showTransientStatus("Custom price accepted! Kitchen will prepare customised dish.")
+    }
+
+    fun declineCustomPrice(orderId: String) {
+        repository.respondToCustomPrice(orderId, false)
+        _pendingPriceProposalOrder.value = null
+        showTransientStatus("Standard food will be prepared at original price.")
     }
 
     fun clearStatusBanner() {

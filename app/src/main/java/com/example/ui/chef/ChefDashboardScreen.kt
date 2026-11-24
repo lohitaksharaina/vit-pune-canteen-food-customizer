@@ -63,6 +63,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.data.model.CustomizationPricingStatus
 import com.example.data.model.OrderStatus
 import com.example.data.model.RestaurantOrder
 import com.example.ui.components.VegNonVegSymbol
@@ -580,6 +581,33 @@ fun ChefOrderTicketCard(
                 color = MaterialTheme.colorScheme.outline,
                 modifier = Modifier.padding(vertical = 10.dp)
             )
+
+            // Custom Pricing Status Badge (shown if admin proposed a price)
+            if (order.customizationPricingStatus != CustomizationPricingStatus.NONE) {
+                val (badgeColor, badgeBg, badgeText) = when (order.customizationPricingStatus) {
+                    CustomizationPricingStatus.PRICE_PROPOSED_BY_ADMIN ->
+                        Triple(Color(0xFFFFC107), Color(0xFF332500), "⏳ Price Awaiting Customer")
+                    CustomizationPricingStatus.ACCEPTED_BY_CUSTOMER ->
+                        Triple(SuccessGreen, Color(0xFF0D2B10), "✓ Custom Price Accepted — Prepare Customised")
+                    CustomizationPricingStatus.DECLINED_BY_CUSTOMER ->
+                        Triple(NonVegRed, Color(0xFF2B0D0D), "✗ Customer Declined — PREPARE NORMAL FOOD")
+                    else -> Triple(Color.Gray, Color(0xFF1A1A1A), "")
+                }
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(badgeBg)
+                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                ) {
+                    Text(
+                        text = badgeText,
+                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                        color = badgeColor
+                    )
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+            }
 
             // Items & Customisation Alerts
             order.items.forEach { item ->

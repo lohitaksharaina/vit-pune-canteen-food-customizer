@@ -57,6 +57,7 @@ import com.example.data.model.MenuCategory
 import com.example.data.model.MenuItem
 import com.example.data.model.RestaurantOrder
 import com.example.ui.components.DishCard
+import com.example.ui.components.RecommendationsSection
 import com.example.ui.components.VegNonVegSymbol
 import com.example.ui.components.WaitlistBanner
 import com.example.ui.theme.FlameOrange
@@ -227,6 +228,13 @@ fun CustomerMenuScreen(
                     }
                 }
             }
+
+            // Recommendations Carousel (time-based suggestions from full catalog)
+            RecommendationsSection(
+                menuItems = com.example.data.MenuCatalog.items,
+                unavailableItemIds = unavailableItemIds,
+                onCustomiseClick = onOpenCustomiser
+            )
 
             // Category Tabs
             ScrollableTabRow(

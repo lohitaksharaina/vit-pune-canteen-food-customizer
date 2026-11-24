@@ -102,6 +102,16 @@ class FirestoreRestaurantRepository(
                             )
                         }
 
+                        val pricingStatusStr = doc.getString("customizationPricingStatus") ?: com.example.data.model.CustomizationPricingStatus.NONE.name
+                        val pricingStatus = try {
+                            com.example.data.model.CustomizationPricingStatus.valueOf(pricingStatusStr)
+                        } catch (e: Exception) {
+                            com.example.data.model.CustomizationPricingStatus.NONE
+                        }
+                        val proposedCustomPrice = doc.getDouble("proposedCustomPrice")
+                        val priceAdjustmentNote = doc.getString("priceAdjustmentNote")
+                        val isCustomizedFoodActive = doc.getBoolean("isCustomizedFoodActive") ?: true
+
                         RestaurantOrder(
                             orderId = orderId,
                             orderNumber = orderNum,
@@ -115,7 +125,11 @@ class FirestoreRestaurantRepository(
                             status = status,
                             isPaidAtCounter = isPaidAtCounter,
                             createdAt = createdAt,
-                            completedAt = completedAt
+                            completedAt = completedAt,
+                            customizationPricingStatus = pricingStatus,
+                            proposedCustomPrice = proposedCustomPrice,
+                            priceAdjustmentNote = priceAdjustmentNote,
+                            isCustomizedFoodActive = isCustomizedFoodActive
                         )
                     } catch (e: Exception) {
                         Log.e(TAG, "Error deserializing order ${doc.id}", e)
@@ -167,6 +181,10 @@ class FirestoreRestaurantRepository(
             "channelCode" to channelCode,
             "userId" to uid,
             "items" to itemsPayload,
+            "customizationPricingStatus" to order.customizationPricingStatus.name,
+            "proposedCustomPrice" to (order.proposedCustomPrice ?: 0.0),
+            "priceAdjustmentNote" to (order.priceAdjustmentNote ?: ""),
+            "isCustomizedFoodActive" to order.isCustomizedFoodActive,
             "createdAt" to FieldValue.serverTimestamp()
         )
 
@@ -200,6 +218,106 @@ class FirestoreRestaurantRepository(
             Log.d(TAG, "Order $orderId status updated to ${newStatus.name}")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to update order status $orderId", e)
+        }
+    }
+
+    /**
+     * Admin sets/proposes a new price for customized food.
+     */
+    suspend fun proposeCustomPrice(orderId: String, newPrice: Double, note: String) {
+        val docRef = firestore.collection(COLLECTION_ORDERS).document(orderId)
+        val updates = mapOf<String, Any>(
+            "customizationPricingStatus" to com.example.data.model.CustomizationPricingStatus.PRICE_PROPOSED_BY_ADMIN.name,
+            "proposedCustomPrice" to newPrice,
+            "priceAdjustmentNote" to note
+        )
+        try {
+            docRef.set(updates, SetOptions.merge()).await()
+            Log.d(TAG, "Proposed price ₹$newPrice for order $orderId")
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed proposing price for order $orderId", e)
+        }
+    }
+
+    /**
+     * Customer accepts or declines the admin's proposed custom price.
+     */
+    suspend fun respondToCustomPrice(orderId: String, accept: Boolean, proposedPrice: Double?, originalPrice: Double) {
+        val docRef = firestore.collection(COLLECTION_ORDERS).document(orderId)
+        val updates: Map<String, Any> = if (accept && proposedPrice != null && proposedPrice > 0) {
+            val newGst = proposedPrice * 0.05
+            val newTotal = proposedPrice + newGst
+            mapOf(
+                "customizationPricingStatus" to com.example.data.model.CustomizationPricingStatus.ACCEPTED_BY_CUSTOMER.name,
+                "subtotal" to proposedPrice,
+                "gst" to newGst,
+                "totalAmount" to newTotal,
+                "isCustomizedFoodActive" to true
+            )
+        } else {
+            mapOf(
+                "customizationPricingStatus" to com.example.data.model.CustomizationPricingStatus.DECLINED_BY_CUSTOMER.name,
+                "isCustomizedFoodActive" to false
+            )
+        }
+        try {
+            docRef.set(updates, SetOptions.merge()).await()
+            Log.d(TAG, "Customer responded to custom price for order $orderId (accept=$accept)")
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed responding to custom price for order $orderId", e)
+        }
+    }
+
+    /**
+     * Real-time listener for out-of-stock / unavailable items across devices.
+     */
+    fun observeUnavailableItemsRealtime(channelCode: String): Flow<Set<String>> = callbackFlow {
+        val docRef = firestore.collection("canteen_settings").document("${channelCode}_availability")
+        val registration = docRef.addSnapshotListener { snapshot, error ->
+            if (error != null) {
+                Log.w(TAG, "Availability listen error", error)
+                return@addSnapshotListener
+            }
+            if (snapshot != null && snapshot.exists()) {
+                @Suppress("UNCHECKED_CAST")
+                val ids = (snapshot.get("unavailableItemIds") as? List<String>)?.toSet() ?: emptySet()
+                trySend(ids)
+            } else {
+                trySend(emptySet())
+            }
+        }
+        awaitClose { registration.remove() }
+    }
+
+    /**
+     * Updates out-of-stock items in Firestore so all student & chef devices sync immediately.
+     */
+    suspend fun syncUnavailableItems(channelCode: String, unavailableIds: Set<String>) {
+        val docRef = firestore.collection("canteen_settings").document("${channelCode}_availability")
+        try {
+            docRef.set(mapOf("unavailableItemIds" to unavailableIds.toList()), SetOptions.merge()).await()
+            Log.d(TAG, "Synced unavailable items (${unavailableIds.size}) to Firestore")
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed syncing unavailable items", e)
+        }
+    }
+
+    /**
+     * Uploads calculated monthly day-wise revenue & item sales report to Firebase.
+     */
+    suspend fun uploadMonthlyReport(channelCode: String, reportData: Map<String, Any>): String {
+        val docRef = firestore.collection("monthly_reports").document()
+        val payload = reportData.toMutableMap()
+        payload["channelCode"] = channelCode
+        payload["reportId"] = docRef.id
+        payload["uploadedAt"] = FieldValue.serverTimestamp()
+        return try {
+            docRef.set(payload).await()
+            Log.d(TAG, "Uploaded monthly report: ${docRef.id}")
+            docRef.id
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed uploading monthly report to Firestore", e)
+            ""
         }
     }
 

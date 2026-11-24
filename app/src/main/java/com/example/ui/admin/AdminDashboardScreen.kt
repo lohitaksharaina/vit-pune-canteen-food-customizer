@@ -49,6 +49,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.data.model.CustomizationPricingStatus
 import com.example.data.model.MenuItem
 import com.example.data.model.OrderStatus
 import com.example.data.model.RestaurantOrder
@@ -73,6 +74,8 @@ fun AdminDashboardScreen(
     onTriggerAutoPurge: () -> Unit,
     onSwitchToStudentView: () -> Unit,
     onSwitchToCookView: () -> Unit,
+    onGenerateRevenueReport: () -> Unit,
+    onSetCustomPrice: (RestaurantOrder) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val totalRevenue = orders.filter { it.isPaidAtCounter }.sumOf { it.totalAmount }
@@ -293,6 +296,33 @@ fun AdminDashboardScreen(
                     )
                     Spacer(modifier = Modifier.height(10.dp))
 
+                    // Revenue Report PDF Button
+                    Button(
+                        onClick = onGenerateRevenueReport,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("admin_generate_report_btn"),
+                        shape = RoundedCornerShape(8.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1A237E))
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.ReceiptLong,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                            tint = Color.White
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "📊 Generate Revenue Report (PDF)",
+                            style = MaterialTheme.typography.labelMedium.copy(
+                                fontWeight = FontWeight.Bold
+                            ),
+                            color = Color.White
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -345,7 +375,96 @@ fun AdminDashboardScreen(
             }
         }
 
-        // 4. Menu Item Stock / Availability Manager
+        // 4. Custom Pricing Requests — orders with customizations
+        val customizableOrders = orders.filter { it.hasCustomizations }
+        if (customizableOrders.isNotEmpty()) {
+            item {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "CUSTOM PRICE REQUESTS",
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 0.8.sp
+                    ),
+                    color = MaterialTheme.colorScheme.secondary
+                )
+                Text(
+                    text = "Orders with ingredient customizations — propose a price if needed.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            items(customizableOrders, key = { "cpr_${it.orderId}" }) { order ->
+                val pricingStatusColor = when (order.customizationPricingStatus) {
+                    CustomizationPricingStatus.PRICE_PROPOSED_BY_ADMIN -> Color(0xFFFFC107)
+                    CustomizationPricingStatus.ACCEPTED_BY_CUSTOMER -> SuccessGreen
+                    CustomizationPricingStatus.DECLINED_BY_CUSTOMER -> NonVegRed
+                    else -> MaterialTheme.colorScheme.onSurfaceVariant
+                }
+                val pricingLabel = when (order.customizationPricingStatus) {
+                    CustomizationPricingStatus.PRICE_PROPOSED_BY_ADMIN -> "⏳ Awaiting Customer"
+                    CustomizationPricingStatus.ACCEPTED_BY_CUSTOMER -> "✓ Price Accepted"
+                    CustomizationPricingStatus.DECLINED_BY_CUSTOMER -> "✗ Declined — Normal"
+                    else -> "No Price Change"
+                }
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "#${order.orderNumber} — ${order.customerName}",
+                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                                color = WarmIvory
+                            )
+                            Text(
+                                text = pricingLabel,
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                color = pricingStatusColor
+                            )
+                            if (order.customizationPricingStatus == CustomizationPricingStatus.PRICE_PROPOSED_BY_ADMIN) {
+                                Text(
+                                    text = "Proposed: ₹${order.proposedCustomPrice?.toInt() ?: "--"}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                        if (order.customizationPricingStatus == CustomizationPricingStatus.NONE ||
+                            order.customizationPricingStatus == CustomizationPricingStatus.DECLINED_BY_CUSTOMER
+                        ) {
+                            Button(
+                                onClick = { onSetCustomPrice(order) },
+                                shape = RoundedCornerShape(8.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = FlameOrange)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.CurrencyRupee,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = "Set Price",
+                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 5. Menu Item Stock / Availability Manager
         item {
             Text(
                 text = "MENU STOCK & AVAILABILITY MANAGER",
@@ -456,7 +575,7 @@ fun AdminDashboardScreen(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "VIT Canteen Management Portal • Engineered with Codex ChatGPT",
+                    text = "VIT Pune Canteen Management System",
                     style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                 )
