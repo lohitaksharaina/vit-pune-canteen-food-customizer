@@ -143,4 +143,62 @@ class ExampleRobolectricTest {
         repo.clearActiveWaitlistDemoOrders()
         assertTrue("Active orders count should be below 30 after clearing demo orders", repo.getActiveOrdersCount() < 30)
     }
+
+    @Test
+    fun `order repository tracks device placed orders for student notification filtering`() {
+        val repo = OrderRepository.getInstance()
+        repo.clearCart()
+        repo.addToCart(
+            CustomisedOrderItem(
+                menuItemId = "vit_bev_02",
+                name = "Kadak Special Cutting Chai",
+                unitPrice = 15.0,
+                quantity = 1,
+                isVeg = true
+            )
+        )
+        val result = repo.placeOrder("Test Student", "Table 01", "9999999999")
+        assertTrue(result.isSuccess)
+        val order = result.getOrNull()
+        assertNotNull(order)
+        assertTrue(
+            "Placed order should be recognized as from this device",
+            repo.isOrderFromThisDevice(order!!.orderId)
+        )
+    }
+
+    @Test
+    fun `custom price proposal and customer response updates status correctly`() {
+        val repo = OrderRepository.getInstance()
+        repo.clearCart()
+        repo.addToCart(
+            CustomisedOrderItem(
+                menuItemId = "vit_snack_01",
+                name = "Puneri Special Misal Pav",
+                unitPrice = 50.0,
+                quantity = 1,
+                isVeg = true,
+                dislikedIngredients = listOf("Onions (Kanda)"),
+                chefNote = "Make it super spicy"
+            )
+        )
+        val result = repo.placeOrder("Tanmay", "Table 05")
+        assertTrue(result.isSuccess)
+        val order = result.getOrNull()!!
+        assertTrue(order.hasCustomizations)
+        assertEquals(com.example.data.model.CustomizationPricingStatus.NONE, order.customizationPricingStatus)
+
+        // Propose price
+        repo.proposeCustomPrice(order.orderId, 65.0, "Special spice blend extra cost")
+        var updated = repo.orders.value.find { it.orderId == order.orderId }!!
+        assertEquals(com.example.data.model.CustomizationPricingStatus.PRICE_PROPOSED_BY_ADMIN, updated.customizationPricingStatus)
+        assertEquals(65.0, updated.proposedCustomPrice ?: 0.0, 0.01)
+
+        // Customer accepts
+        repo.respondToCustomPrice(order.orderId, true)
+        updated = repo.orders.value.find { it.orderId == order.orderId }!!
+        assertEquals(com.example.data.model.CustomizationPricingStatus.ACCEPTED_BY_CUSTOMER, updated.customizationPricingStatus)
+        assertTrue(updated.isCustomizedFoodActive)
+        assertEquals(65.0, updated.subtotal, 0.01)
+    }
 }

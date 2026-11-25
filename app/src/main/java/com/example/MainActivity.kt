@@ -1,6 +1,7 @@
 package com.example
 
 import android.Manifest
+import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -49,20 +50,44 @@ import com.example.ui.viewmodel.RestaurantViewModel
 import com.example.util.CanteenNotificationHelper
 
 class MainActivity : ComponentActivity() {
+    private var pendingTargetMode by mutableStateOf<AppMode?>(null)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         CanteenNotificationHelper.createNotificationChannel(this)
+        handleNotificationIntent(intent)
         enableEdgeToEdge()
         setContent {
             MyApplicationTheme {
-                RestaurantApp()
+                RestaurantApp(
+                    pendingTargetMode = pendingTargetMode,
+                    onTargetModeHandled = { pendingTargetMode = null }
+                )
             }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleNotificationIntent(intent)
+    }
+
+    private fun handleNotificationIntent(intent: Intent?) {
+        intent?.getStringExtra(CanteenNotificationHelper.EXTRA_TARGET_APP_MODE)?.let { modeStr ->
+            try {
+                pendingTargetMode = AppMode.valueOf(modeStr)
+            } catch (_: Exception) {}
         }
     }
 }
 
 @Composable
-fun RestaurantApp(viewModel: RestaurantViewModel = viewModel()) {
+fun RestaurantApp(
+    pendingTargetMode: AppMode? = null,
+    onTargetModeHandled: () -> Unit = {},
+    viewModel: RestaurantViewModel = viewModel()
+) {
     val context = LocalContext.current
     val currentUser by viewModel.currentUser.collectAsStateWithLifecycle()
     val currentMode by viewModel.currentMode.collectAsStateWithLifecycle()
@@ -117,6 +142,14 @@ fun RestaurantApp(viewModel: RestaurantViewModel = viewModel()) {
         viewModel.initFirestore(context)
     }
 
+    // Handle notification click intent to switch to target mode immediately
+    LaunchedEffect(pendingTargetMode) {
+        pendingTargetMode?.let { targetMode ->
+            viewModel.setMode(targetMode)
+            onTargetModeHandled()
+        }
+    }
+
     // Request Android System Notification Permission immediately on startup
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -132,56 +165,72 @@ fun RestaurantApp(viewModel: RestaurantViewModel = viewModel()) {
         }
     }
 
-    // 1. Phone Status Bar Notifications for New Orders
+    // 1. Phone Status Bar Notifications for New Orders (Role-filtered)
     LaunchedEffect(Unit) {
         viewModel.notifyNewOrder.collect { order ->
-            if (currentMode == AppMode.CHEF || currentMode == AppMode.ADMIN) {
-                CanteenNotificationHelper.showNewOrderNotification(context, order)
-            } else {
-                val itemsSummary = order.items.joinToString(", ") { "${it.quantity}x ${it.name}" }
-                CanteenNotificationHelper.showStudentOrderStatusNotification(
-                    context,
-                    order,
-                    "🔔 Order #${order.orderNumber} Placed (${order.tableNumber})",
-                    "$itemsSummary • ₹${order.totalAmount.toInt()} (Sent to kitchen)"
-                )
+            when (currentMode) {
+                AppMode.CHEF -> {
+                    CanteenNotificationHelper.showNewOrderNotification(context, order, targetMode = "CHEF")
+                }
+                AppMode.ADMIN -> {
+                    if (order.hasCustomizations) {
+                        CanteenNotificationHelper.showAdminCustomOrderNotification(context, order)
+                    } else {
+                        CanteenNotificationHelper.showNewOrderNotification(context, order, targetMode = "ADMIN")
+                    }
+                }
+                AppMode.CUSTOMER -> {
+                    // Students only receive notifications for their own placed orders
+                    if (viewModel.isStudentOwnOrder(order)) {
+                        val itemsSummary = order.items.joinToString(", ") { "${it.quantity}x ${it.name}" }
+                        CanteenNotificationHelper.showStudentOrderStatusNotification(
+                            context,
+                            order,
+                            "🔔 Order #${order.orderNumber} Placed (${order.tableNumber})",
+                            "$itemsSummary • ₹${order.totalAmount.toInt()} (Sent to kitchen)"
+                        )
+                    }
+                }
             }
         }
     }
 
-    // 2. Phone Status Bar Notifications for Order Progress (Preparing, Ready, Settled)
+    // 2. Phone Status Bar Notifications for Order Progress (Student-specific: only for own orders)
     var previousOrderStatusMap by remember { mutableStateOf<Map<String, OrderStatus>>(emptyMap()) }
     LaunchedEffect(orders) {
         if (previousOrderStatusMap.isNotEmpty()) {
             orders.forEach { order ->
                 val prevStatus = previousOrderStatusMap[order.orderId]
                 if (prevStatus != null && prevStatus != order.status) {
-                    when (order.status) {
-                        OrderStatus.ACCEPTED_PREPARING -> {
-                            CanteenNotificationHelper.showStudentOrderStatusNotification(
-                                context,
-                                order,
-                                "🍳 Order #${order.orderNumber} Preparing",
-                                "The kitchen has accepted your order and is cooking your food."
-                            )
+                    // Only alert the student if this is their own order
+                    if (viewModel.isStudentOwnOrder(order)) {
+                        when (order.status) {
+                            OrderStatus.ACCEPTED_PREPARING -> {
+                                CanteenNotificationHelper.showStudentOrderStatusNotification(
+                                    context,
+                                    order,
+                                    "🍳 Order #${order.orderNumber} Preparing",
+                                    "The kitchen has accepted your order and is cooking your food."
+                                )
+                            }
+                            OrderStatus.READY_FOR_COUNTER -> {
+                                CanteenNotificationHelper.showStudentOrderStatusNotification(
+                                    context,
+                                    order,
+                                    "🎉 Order #${order.orderNumber} Ready for Pickup!",
+                                    "Your hot food is ready at the canteen counter. Please collect!"
+                                )
+                            }
+                            OrderStatus.COMPLETED_SETTLED -> {
+                                CanteenNotificationHelper.showStudentOrderStatusNotification(
+                                    context,
+                                    order,
+                                    "✓ Order #${order.orderNumber} Settled",
+                                    "Payment completed at counter. Thank you for dining at VIT Canteen!"
+                                )
+                            }
+                            else -> {}
                         }
-                        OrderStatus.READY_FOR_COUNTER -> {
-                            CanteenNotificationHelper.showStudentOrderStatusNotification(
-                                context,
-                                order,
-                                "🎉 Order #${order.orderNumber} Ready for Pickup!",
-                                "Your hot food is ready at the canteen counter. Please collect!"
-                            )
-                        }
-                        OrderStatus.COMPLETED_SETTLED -> {
-                            CanteenNotificationHelper.showStudentOrderStatusNotification(
-                                context,
-                                order,
-                                "✓ Order #${order.orderNumber} Settled",
-                                "Payment completed at counter. Thank you for dining at VIT Canteen!"
-                            )
-                        }
-                        else -> {}
                     }
                 }
             }
@@ -189,17 +238,19 @@ fun RestaurantApp(viewModel: RestaurantViewModel = viewModel()) {
         previousOrderStatusMap = orders.associate { it.orderId to it.status }
     }
 
-    // 3. Phone Status Bar Notification for Admin Custom Price Proposal
+    // 3. Phone Status Bar Notification for Admin/Chef Custom Price Proposal (Only student's own order)
     var notifiedProposalOrderId by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(pendingPriceProposalOrder) {
         pendingPriceProposalOrder?.let { proposal ->
             if (proposal.orderId != notifiedProposalOrderId) {
-                notifiedProposalOrderId = proposal.orderId
-                CanteenNotificationHelper.showCustomPriceNotification(
-                    context,
-                    proposal,
-                    proposal.proposedCustomPrice ?: proposal.totalAmount
-                )
+                if (viewModel.isStudentOwnOrder(proposal)) {
+                    notifiedProposalOrderId = proposal.orderId
+                    CanteenNotificationHelper.showCustomPriceNotification(
+                        context,
+                        proposal,
+                        proposal.proposedCustomPrice ?: proposal.totalAmount
+                    )
+                }
             }
         }
     }
@@ -286,7 +337,8 @@ fun RestaurantApp(viewModel: RestaurantViewModel = viewModel()) {
                         onViewBill = { viewModel.viewBill(it) },
                         onTriggerAutoPurge = { viewModel.triggerAutoPurgeNow() },
                         onFillWaitlistForTesting = { viewModel.fillWaitlistForTesting() },
-                        onResetWaitlistOrders = { viewModel.resetWaitlistOrders() }
+                        onResetWaitlistOrders = { viewModel.resetWaitlistOrders() },
+                        onSetCustomPrice = { viewModel.openPriceAdjustmentForOrder(it) }
                     )
                 }
 

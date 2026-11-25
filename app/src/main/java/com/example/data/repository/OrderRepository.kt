@@ -50,6 +50,16 @@ class OrderRepository private constructor() {
     private val _prunedCount = MutableStateFlow(0)
     val prunedCount: StateFlow<Int> = _prunedCount.asStateFlow()
 
+    private val myDevicePlacedOrderIds = java.util.Collections.synchronizedSet(mutableSetOf<String>())
+
+    fun isOrderFromThisDevice(orderId: String): Boolean {
+        return myDevicePlacedOrderIds.contains(orderId)
+    }
+
+    fun markOrderPlacedFromThisDevice(orderId: String) {
+        myDevicePlacedOrderIds.add(orderId)
+    }
+
     private val nextOrderSequence = AtomicInteger(103)
 
     init {
@@ -205,6 +215,7 @@ class OrderRepository private constructor() {
         val updated = _orders.value.toMutableList()
         updated.add(0, newOrder)
         _orders.value = updated
+        myDevicePlacedOrderIds.add(newOrder.orderId)
         clearCart()
         _newOrderEvents.tryEmit(newOrder)
 
@@ -517,5 +528,6 @@ class OrderRepository private constructor() {
             )
         )
         _orders.value = initialList
+        myDevicePlacedOrderIds.add("VIT-CAN-101")
     }
 }

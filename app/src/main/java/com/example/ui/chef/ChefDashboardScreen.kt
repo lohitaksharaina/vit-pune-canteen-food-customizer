@@ -53,8 +53,13 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -92,8 +97,18 @@ fun ChefDashboardScreen(
     onTriggerAutoPurge: () -> Unit,
     onFillWaitlistForTesting: () -> Unit,
     onResetWaitlistOrders: () -> Unit,
+    onSetCustomPrice: (RestaurantOrder) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    // Dynamic timer ticker to allow live countdown and authority transition after 5 minutes
+    var currentTime by remember { mutableStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(1000L)
+            currentTime = System.currentTimeMillis()
+        }
+    }
+
     // Memoized filter for smooth scrolling and elimination of re-calculation jank
     val displayedOrders = remember(orders, statusFilter, searchQuery) {
         val trimmedQuery = searchQuery.trim()
@@ -442,6 +457,7 @@ fun ChefDashboardScreen(
                 Box(modifier = Modifier.padding(horizontal = 16.dp)) {
                     ChefOrderTicketCard(
                         order = order,
+                        currentTime = currentTime,
                         onAccept = {
                             try { onAcceptOrder(order.orderId) } catch (_: Exception) {}
                         },
@@ -451,7 +467,8 @@ fun ChefDashboardScreen(
                         onMarkPaidAtCounter = {
                             try { onMarkPaidAtCounter(order.orderId) } catch (_: Exception) {}
                         },
-                        onViewBill = { onViewBill(order) }
+                        onViewBill = { onViewBill(order) },
+                        onSetCustomPrice = { onSetCustomPrice(order) }
                     )
                 }
                 Spacer(modifier = Modifier.height(12.dp))
@@ -463,10 +480,12 @@ fun ChefDashboardScreen(
 @Composable
 fun ChefOrderTicketCard(
     order: RestaurantOrder,
+    currentTime: Long = System.currentTimeMillis(),
     onAccept: () -> Unit,
     onMarkReady: () -> Unit,
     onMarkPaidAtCounter: () -> Unit,
-    onViewBill: () -> Unit
+    onViewBill: () -> Unit,
+    onSetCustomPrice: () -> Unit = {}
 ) {
     // Cache formatted timestamp to prevent jank during list scrolling
     val timeFormatted = remember(order.createdAt) {
@@ -735,24 +754,108 @@ fun ChefOrderTicketCard(
                 // Workflow Action Button
                 when (order.status) {
                     OrderStatus.RECEIVED -> {
-                        Button(
-                            onClick = onAccept,
-                            modifier = Modifier
-                                .weight(1f)
-                                .testTag("ticket_accept_btn_${order.orderId}"),
-                            shape = RoundedCornerShape(8.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = FlameOrange)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Check,
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = "Accept & Prepare Order",
-                                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
-                            )
+                        val isCustomPricingResolved = !order.hasCustomizations ||
+                            order.customizationPricingStatus == CustomizationPricingStatus.ACCEPTED_BY_CUSTOMER ||
+                            order.customizationPricingStatus == CustomizationPricingStatus.DECLINED_BY_CUSTOMER
+
+                        if (!isCustomPricingResolved) {
+                            if (order.customizationPricingStatus == CustomizationPricingStatus.PRICE_PROPOSED_BY_ADMIN) {
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(Color(0xFF332508))
+                                        .padding(horizontal = 8.dp, vertical = 8.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = "⏳ Awaiting Student Acceptance (₹${order.proposedCustomPrice?.toInt() ?: 0})",
+                                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                        color = Color(0xFFFFC107)
+                                    )
+                                }
+                            } else {
+                                // customizationPricingStatus is NONE
+                                val elapsedMs = currentTime - order.createdAt
+                                val fiveMinutesMs = 5 * 60 * 1000L
+                                if (elapsedMs < fiveMinutesMs) {
+                                    val remainingMs = (fiveMinutesMs - elapsedMs).coerceAtLeast(0L)
+                                    val remainingM = (remainingMs / 1000L) / 60
+                                    val remainingS = (remainingMs / 1000L) % 60
+                                    Button(
+                                        onClick = {},
+                                        enabled = false,
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .testTag("ticket_pricing_waiting_${order.orderId}"),
+                                        shape = RoundedCornerShape(8.dp),
+                                        colors = ButtonDefaults.buttonColors(
+                                            disabledContainerColor = Color(0xFF2C241D),
+                                            disabledContentColor = Color(0xFFB0A090)
+                                        )
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.AccessTime,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(14.dp),
+                                            tint = Color(0xFFB0A090)
+                                        )
+                                        Spacer(modifier = Modifier.width(5.dp))
+                                        Text(
+                                            text = "⏳ Admin Reviewing (${remainingM}m ${remainingS}s)",
+                                            style = MaterialTheme.typography.labelSmall.copy(
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 11.sp
+                                            )
+                                        )
+                                    }
+                                } else {
+                                    // 5 minutes of admin inactivity has passed! Authority shifts to chef!
+                                    Button(
+                                        onClick = onSetCustomPrice,
+                                        enabled = true,
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .testTag("ticket_chef_set_price_${order.orderId}"),
+                                        shape = RoundedCornerShape(8.dp),
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = FlameOrange,
+                                            contentColor = Color.White
+                                        )
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.EditNote,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(5.dp))
+                                        Text(
+                                            text = "🏷️ Review & Set Custom Price",
+                                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
+                                        )
+                                    }
+                                }
+                            }
+                        } else {
+                            Button(
+                                onClick = onAccept,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag("ticket_accept_btn_${order.orderId}"),
+                                shape = RoundedCornerShape(8.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = FlameOrange)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Check,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "Accept & Prepare Order",
+                                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
+                                )
+                            }
                         }
                     }
                     OrderStatus.ACCEPTED_PREPARING -> {

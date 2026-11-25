@@ -25,6 +25,9 @@ object CanteenNotificationHelper {
     private const val CHANNEL_NAME = "VIT Canteen Live Orders"
     private const val CHANNEL_DESC = "Status bar notifications for students, cooks and admin"
 
+    const val EXTRA_TARGET_APP_MODE = "TARGET_APP_MODE"
+    const val EXTRA_TARGET_ORDER_ID = "TARGET_ORDER_ID"
+
     /**
      * Initializes the Android notification channel with high priority, sound and vibration.
      */
@@ -56,9 +59,10 @@ object CanteenNotificationHelper {
     }
 
     /**
-     * Shows a system status bar notification for kitchen staff and admin on new orders.
+     * Shows a system status bar notification for kitchen staff on new orders.
+     * Clicking opens CHEF mode.
      */
-    fun showNewOrderNotification(context: Context, order: RestaurantOrder) {
+    fun showNewOrderNotification(context: Context, order: RestaurantOrder, targetMode: String = "CHEF") {
         createNotificationChannel(context)
         if (!hasNotificationPermission(context)) {
             Log.d(TAG, "Notification permission not granted, skipping showNewOrderNotification")
@@ -66,7 +70,9 @@ object CanteenNotificationHelper {
         }
 
         val intent = Intent(context, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra(EXTRA_TARGET_APP_MODE, targetMode)
+            putExtra(EXTRA_TARGET_ORDER_ID, order.orderId)
         }
         val pendingIntent = PendingIntent.getActivity(
             context,
@@ -81,7 +87,7 @@ object CanteenNotificationHelper {
 
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.stat_notify_chat)
-            .setContentTitle("🔔 New Order #${order.orderNumber} (${order.tableNumber})")
+            .setContentTitle("🔔 New Kitchen Order #${order.orderNumber} (${order.tableNumber})")
             .setContentText(contentText)
             .setStyle(NotificationCompat.BigTextStyle().bigText("Customer: ${order.customerName}\nItems: $itemsSummary\nTotal: ₹${order.totalAmount.toInt()}"))
             .setPriority(NotificationCompat.PRIORITY_MAX)
@@ -101,7 +107,50 @@ object CanteenNotificationHelper {
     }
 
     /**
+     * Shows a system status bar notification for Admin when a customized order needs price review.
+     * Clicking opens ADMIN mode.
+     */
+    fun showAdminCustomOrderNotification(context: Context, order: RestaurantOrder) {
+        createNotificationChannel(context)
+        if (!hasNotificationPermission(context)) return
+
+        val intent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra(EXTRA_TARGET_APP_MODE, "ADMIN")
+            putExtra(EXTRA_TARGET_ORDER_ID, order.orderId)
+        }
+        val pendingIntent = PendingIntent.getActivity(
+            context,
+            order.orderNumber + 30000,
+            intent,
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+
+        val soundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+
+        val builder = NotificationCompat.Builder(context, CHANNEL_ID)
+            .setSmallIcon(android.R.drawable.stat_notify_chat)
+            .setContentTitle("📝 Customization Review: Order #${order.orderNumber}")
+            .setContentText("Customer ${order.customerName} requested food customizations. Tap to review & set price.")
+            .setStyle(NotificationCompat.BigTextStyle().bigText("Customer: ${order.customerName} (${order.tableNumber})\nHas customized ingredients/notes requiring admin review.\nTap to open Admin Mode."))
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setDefaults(NotificationCompat.DEFAULT_ALL)
+            .setSound(soundUri)
+            .setAutoCancel(true)
+            .setContentIntent(pendingIntent)
+
+        try {
+            val notificationManager = NotificationManagerCompat.from(context)
+            notificationManager.notify(order.orderNumber + 30000, builder.build())
+            Log.d(TAG, "Displayed admin review notification for Order #${order.orderNumber}")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error displaying admin notification", e)
+        }
+    }
+
+    /**
      * Shows a status bar notification to student when order is placed, accepted, or ready for pickup.
+     * Clicking opens CUSTOMER (Student) mode.
      */
     fun showStudentOrderStatusNotification(
         context: Context,
@@ -113,7 +162,9 @@ object CanteenNotificationHelper {
         if (!hasNotificationPermission(context)) return
 
         val intent = Intent(context, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra(EXTRA_TARGET_APP_MODE, "CUSTOMER")
+            putExtra(EXTRA_TARGET_ORDER_ID, order.orderId)
         }
         val pendingIntent = PendingIntent.getActivity(
             context,
@@ -146,7 +197,8 @@ object CanteenNotificationHelper {
     }
 
     /**
-     * Shows a status bar notification when Admin proposes a price adjustment.
+     * Shows a status bar notification when Admin/Chef proposes a price adjustment.
+     * Clicking opens CUSTOMER (Student) mode.
      */
     fun showCustomPriceNotification(
         context: Context,
@@ -157,7 +209,9 @@ object CanteenNotificationHelper {
         if (!hasNotificationPermission(context)) return
 
         val intent = Intent(context, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra(EXTRA_TARGET_APP_MODE, "CUSTOMER")
+            putExtra(EXTRA_TARGET_ORDER_ID, order.orderId)
         }
         val pendingIntent = PendingIntent.getActivity(
             context,
@@ -169,10 +223,10 @@ object CanteenNotificationHelper {
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.stat_notify_chat)
             .setContentTitle("🏷️ Price Adjusted for Order #${order.orderNumber}")
-            .setContentText("Admin proposed ₹${newPrice.toInt()} for your customized food. Tap to accept or decline.")
+            .setContentText("Reviewer proposed ₹${newPrice.toInt()} for your customized food. Tap to accept or decline.")
             .setStyle(
                 NotificationCompat.BigTextStyle()
-                    .bigText("Admin has proposed ₹${newPrice.toInt()} for your customized items on Order #${order.orderNumber}. Open the app to Accept or Decline.")
+                    .bigText("Admin/Chef proposed ₹${newPrice.toInt()} for your customized items on Order #${order.orderNumber}. Open the app to Accept or Decline.")
             )
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setDefaults(NotificationCompat.DEFAULT_ALL)

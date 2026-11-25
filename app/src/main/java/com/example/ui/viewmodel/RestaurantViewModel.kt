@@ -565,6 +565,19 @@ class RestaurantViewModel : ViewModel() {
         showTransientStatus("Standard food will be prepared at original price.")
     }
 
+    fun isStudentOwnOrder(order: RestaurantOrder): Boolean {
+        if (repository.isOrderFromThisDevice(order.orderId)) return true
+        val loggedInUser = _currentUser.value?.displayName
+        if (!loggedInUser.isNullOrBlank() && loggedInUser.equals(order.customerName, ignoreCase = true)) {
+            return true
+        }
+        val currentName = _customerName.value.trim()
+        if (currentName.isNotBlank() && currentName.equals(order.customerName, ignoreCase = true)) {
+            return true
+        }
+        return false
+    }
+
     fun clearStatusBanner() {
         _statusBannerMessage.value = null
     }
