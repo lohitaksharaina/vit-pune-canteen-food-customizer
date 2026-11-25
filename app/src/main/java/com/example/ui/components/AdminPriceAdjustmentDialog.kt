@@ -11,12 +11,16 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CurrencyRupee
-import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -68,6 +72,7 @@ fun AdminPriceAdjustmentDialog(
         mutableStateOf(order.priceAdjustmentNote ?: "Custom ingredients & chef preparation surcharge")
     }
     var errorMsg by remember { mutableStateOf<String?>(null) }
+    val scrollState = rememberScrollState()
 
     Dialog(onDismissRequest = onDismiss) {
         Card(
@@ -81,6 +86,7 @@ fun AdminPriceAdjustmentDialog(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .verticalScroll(scrollState)
                     .padding(20.dp)
             ) {
                 // Header
@@ -125,11 +131,153 @@ fun AdminPriceAdjustmentDialog(
 
                 HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = MaterialTheme.colorScheme.outline)
 
+                // Customization Request Details Section
                 Text(
-                    text = "Current Base Subtotal: ₹${String.format(Locale.getDefault(), "%.2f", order.subtotal)}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    text = "CUSTOMER REQUEST DETAILS",
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 0.8.sp
+                    ),
+                    color = MaterialTheme.colorScheme.secondary
                 )
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    order.items.forEach { item ->
+                        val hasCustomizations = item.dislikedIngredients.isNotEmpty() ||
+                            item.chefNote.isNotBlank() ||
+                            (item.spicePreference.isNotBlank() && item.spicePreference != "Normal")
+
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(10.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (hasCustomizations)
+                                    MaterialTheme.colorScheme.surfaceVariant
+                                else
+                                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                            )
+                        ) {
+                            Column(modifier = Modifier.padding(10.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        VegNonVegSymbol(isVeg = item.isVeg)
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = "${item.quantity}x ${item.name}",
+                                            style = MaterialTheme.typography.bodyMedium.copy(
+                                                fontWeight = FontWeight.Bold
+                                            ),
+                                            color = WarmIvory
+                                        )
+                                    }
+                                    Text(
+                                        text = "₹${item.totalPrice.toInt()}",
+                                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold),
+                                        color = WarmIvory
+                                    )
+                                }
+
+                                if (item.spicePreference.isNotBlank() && item.spicePreference != "Normal") {
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = "Spice Preference: ${item.spicePreference}",
+                                        style = MaterialTheme.typography.labelSmall.copy(
+                                            color = MaterialTheme.colorScheme.secondary,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                    )
+                                }
+
+                                // Excluded Ingredients (Disliked)
+                                if (item.dislikedIngredients.isNotEmpty()) {
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(6.dp))
+                                            .background(Color(0xFF4A1010))
+                                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                                    ) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Icon(
+                                                imageVector = Icons.Default.Block,
+                                                contentDescription = null,
+                                                tint = Color(0xFFFF8A80),
+                                                modifier = Modifier.size(14.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text(
+                                                text = "Exclude: ${item.dislikedIngredients.joinToString(", ")}",
+                                                style = MaterialTheme.typography.labelSmall.copy(
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = Color(0xFFFF8A80)
+                                                )
+                                            )
+                                        }
+                                    }
+                                }
+
+                                // Special Chef Note / Instruction
+                                if (item.chefNote.isNotBlank()) {
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(6.dp))
+                                            .background(Color(0xFF332508))
+                                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                                    ) {
+                                        Row(verticalAlignment = Alignment.Top) {
+                                            Icon(
+                                                imageVector = Icons.Default.EditNote,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.secondary,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text(
+                                                text = "Chef Note: \"${item.chefNote}\"",
+                                                style = MaterialTheme.typography.labelSmall.copy(
+                                                    fontWeight = FontWeight.SemiBold,
+                                                    color = MaterialTheme.colorScheme.secondary
+                                                )
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+                Spacer(modifier = Modifier.height(10.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Current Base Subtotal:",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = "₹${String.format(Locale.getDefault(), "%.2f", order.subtotal)}",
+                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                        color = WarmIvory
+                    )
+                }
 
                 Spacer(modifier = Modifier.height(12.dp))
 
@@ -207,7 +355,12 @@ fun AdminPriceAdjustmentDialog(
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = FlameOrange)
                 ) {
-                    Icon(imageVector = Icons.Default.Send, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color.White)
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.Send,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                        tint = Color.White
+                    )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
                         text = "Send Price Proposal to Customer",
